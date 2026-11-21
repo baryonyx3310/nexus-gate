@@ -57,7 +57,8 @@ UPPER = [
     box([3.9, 0, 6], [12.1, 9, 10], "#core", faces=("east", "west"), uv=[6, 4, 10, 13], glow=True),
     box([2, 10, 2], [14, 12, 14], "#base", up="#top", down="#base"),
     box([7, 12, 7], [9, 15, 9], "#side", faces=("north", "south", "east", "west")),
-    box([6.5, 15, 6.5], [9.5, 16.5, 9.5], "#core", uv=[6, 0, 9, 3], glow=True),
+    # Kept within y <= 16 so the combined item model (upper shifted by 16) stays inside the 32 limit.
+    box([6.5, 15, 6.5], [9.5, 16, 9.5], "#core", uv=[6, 0, 9, 3], glow=True),
 ]
 
 

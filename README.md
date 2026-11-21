@@ -1,0 +1,69 @@
+# Nexus Gate
+
+Mod de teleporte com estética tecnológica para **Minecraft 1.21.1 / NeoForge**. Viajar entre bases é cômodo. Usar o teleporte para fugir de uma luta não funciona.
+
+## Conteúdo
+
+- **Estação de Teleporte**: bloco de 2 de altura, de metal escuro com núcleo ciano brilhante.
+  - Ao colocar, você escolhe o nome dela.
+  - Clique direito numa estação nova sincroniza (ativa) ela para você.
+  - Clique direito numa estação sincronizada abre o terminal de seleção.
+- **Localizador**: aponta a direção e a distância até uma estação vinculada.
+  - Para vincular, agache e clique com ele numa estação.
+  - Ele **não teleporta**.
+- **Estações públicas**: um admin (OP) marca a estação e ela aparece para todos os jogadores sem precisar sincronizar. Só admin consegue quebrar uma estação pública, e explosões não a destroem.
+- **Xaero's Minimap (opcional)**: cria um waypoint quando você sincroniza uma estação.
+
+## Regras contra fuga
+
+| Regra | Padrão |
+|---|---|
+| Distância máxima da estação para começar | 4 blocos |
+| Bloqueio após levar ou causar dano | 10 s |
+| Tempo de carregamento | 5 s |
+| Extra por mob hostil (raio de 8 blocos) | +1 s cada |
+| Extra para trocar de dimensão | +3 s |
+| Tempo máximo de carregamento | 12 s |
+| Cancela se levar dano, andar mais de 1,5 bloco, quebrarem a estação, morrer ou sair | — |
+
+## Custo em XP
+
+- **Mesma dimensão:** 1 nível, mais 1 a cada 500 blocos, até no máximo 10 níveis.
+- **Entre dimensões:** 5 níveis.
+- **Cobrança:** só acontece quando o teleporte conclui. Teleporte cancelado não cobra.
+- **Criativo:** não paga.
+
+Todos os valores ficam em `config/nexusgate-server.toml` (ou `serverconfig/` dentro do mundo).
+
+## Comandos (admin)
+
+- `/nexusgate public true|false`: marca como pública ou privada a estação para onde você está olhando.
+
+## Compilar
+
+Requer o JDK 21.
+
+```sh
+./gradlew build          # jar em build/libs/nexusgate-1.0.0.jar
+./gradlew test           # testes das regras
+./gradlew runClient      # abre o jogo de desenvolvimento
+```
+
+Se o projeto ficar dentro do OneDrive e o Gradle reclamar de arquivos travados, defina a variável `NEXUSGATE_BUILD_DIR` com uma pasta fora do OneDrive.
+
+As texturas e os JSONs são gerados por `python tools/gen_textures.py` e `python tools/gen_assets.py`.
+
+## Checklist de teste no jogo
+
+- [ ] Colocar uma estação abre a tela de nome. O nome vem em português.
+- [ ] Clicar numa estação de outra pessoa sincroniza ela e mostra a mensagem.
+- [ ] O terminal lista as estações com distância e custo de XP. As que você não consegue pagar aparecem em vermelho.
+- [ ] O teleporte carrega por 5 s com a barra e as partículas, e cobra o XP na chegada.
+- [ ] Levar dano de um zumbi durante o carregamento cancela o teleporte. Logo depois, aparece "Interferência detectada".
+- [ ] Andar 2 blocos durante o carregamento cancela.
+- [ ] Quebrar a estação de destino durante o carregamento cancela.
+- [ ] Ir para o Nether custa 5 XP e carrega por 8 s.
+- [ ] Um OP consegue tornar uma estação pública pelo botão e pelo comando.
+- [ ] Um jogador **sem OP** não vê o botão de pública e não consegue quebrar uma estação pública.
+- [ ] O Localizador mostra seta e distância. Quebrando a estação, ele mostra "Sinal perdido".
+- [ ] Com o Xaero's Minimap instalado, o waypoint aparece ao sincronizar. Se não aparecer, procure "Xaero" no log.

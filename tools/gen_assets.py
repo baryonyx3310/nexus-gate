@@ -168,6 +168,7 @@ LANG = {
     # lifecycle / charging
     "msg.nexusgate.synced": ("Estação %s sincronizada", "Station %s synchronized"),
     "msg.nexusgate.interrupted": ("Sincronização interrompida", "Synchronization interrupted"),
+    "msg.nexusgate.no_safe_spot": ("Destino obstruído: nenhum local seguro para chegar", "Destination blocked: no safe place to arrive"),
     "msg.nexusgate.arrived": ("Chegada: %s", "Arrived: %s"),
     "msg.nexusgate.renamed": ("Estação renomeada para %s", "Station renamed to %s"),
     "msg.nexusgate.no_permission": ("Sem permissão", "No permission"),

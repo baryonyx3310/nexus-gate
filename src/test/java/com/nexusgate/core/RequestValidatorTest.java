@@ -55,9 +55,15 @@ class RequestValidatorTest {
     }
 
     @Test void validator_completionRecheckFailsWithoutXp() {
-        assertEquals(RequestResult.NOT_ENOUGH_XP, RequestValidator.validateCompletion(2, false, 3));
-        assertEquals(RequestResult.OK, RequestValidator.validateCompletion(3, false, 3));
-        assertEquals(RequestResult.OK, RequestValidator.validateCompletion(0, true, 3));
+        assertEquals(RequestResult.NOT_ENOUGH_XP, RequestValidator.validateCompletion(2, false, 3, true));
+        assertEquals(RequestResult.OK, RequestValidator.validateCompletion(3, false, 3, true));
+        assertEquals(RequestResult.OK, RequestValidator.validateCompletion(0, true, 3, true));
+    }
+
+    /** A record whose block vanished (crash, chunk tools) must not teleport the player into nothing. */
+    @Test void validator_completionFailsWhenTargetBlockMissing() {
+        assertEquals(RequestResult.TARGET_OFFLINE, RequestValidator.validateCompletion(30, false, 3, false));
+        assertEquals(RequestResult.TARGET_OFFLINE, RequestValidator.validateCompletion(0, true, 3, false));
     }
 
     @Test void resultTranslationKeys() {

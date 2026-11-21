@@ -13,6 +13,7 @@
   "msg.nexusgate.not_enough_xp": "XP insuficiente: precisa de %s níveis",
   "msg.nexusgate.synced": "Estação %s sincronizada",
   "msg.nexusgate.interrupted": "Sincronização interrompida",
+  "msg.nexusgate.no_safe_spot": "Destino obstruído: nenhum local seguro para chegar",
   "msg.nexusgate.arrived": "Chegada: %s",
   "msg.nexusgate.renamed": "Estação renomeada para %s",
   "msg.nexusgate.no_permission": "Sem permissão",

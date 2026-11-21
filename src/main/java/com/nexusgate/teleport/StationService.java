@@ -1,6 +1,7 @@
 package com.nexusgate.teleport;
 
 import com.nexusgate.NexusGate;
+import com.nexusgate.block.TeleportStationBlock;
 import com.nexusgate.block.TeleportStationBlockEntity;
 import com.nexusgate.core.Permissions;
 import com.nexusgate.config.NexusConfig;
@@ -23,6 +24,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
@@ -142,6 +145,12 @@ public final class StationService {
         return StationNetwork.get(level.getServer()).at(level.dimension(), lowerPos);
     }
 
+    /** True if a lower-half station block is at pos. */
+    public static boolean isStationBlock(ServerLevel level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        return state.getBlock() instanceof TeleportStationBlock && state.getValue(TeleportStationBlock.HALF) == DoubleBlockHalf.LOWER;
+    }
+
     /** Distance from the player to the centre of a station lower half. */
     public static double distanceTo(ServerPlayer player, StationRecord record) {
         BlockPos p = record.pos();
@@ -162,9 +171,15 @@ public final class StationService {
         XpSettings xp = NexusConfig.xpSettings();
         String currentDim = player.level().dimension().location().toString();
         List<StationEntry> entries = new ArrayList<>();
-        for (StationRecord r : network.all()) {
+        for (StationRecord r : List.copyOf(network.all())) {
             if (r.id().equals(source.id()) || !isKnown(player, r)) continue;
-            if (player.server.getLevel(r.dimension()) == null) continue;
+            ServerLevel targetLevel = player.server.getLevel(r.dimension());
+            if (targetLevel == null) continue;
+            // Prune records whose block is gone, when we can check without loading chunks.
+            if (targetLevel.isLoaded(r.pos()) && !isStationBlock(targetLevel, r.pos())) {
+                network.remove(r.id());
+                continue;
+            }
             boolean cross = !r.dimension().equals(player.level().dimension());
             double distance = cross ? -1 : distanceTo(player, r);
             int cost = XpCost.levels(Math.max(0, distance), cross, xp);

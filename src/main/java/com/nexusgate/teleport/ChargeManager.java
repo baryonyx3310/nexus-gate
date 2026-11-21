@@ -71,7 +71,7 @@ public final class ChargeManager {
         int ticks = ChargeRules.chargeTicks(hostiles, cross, settings);
         SESSIONS.put(player.getUUID(), new Active(sourceId, targetId, new ChargeSession(ticks, settings.maxMoveDistance()),
                 player.position(), cost));
-        CombatEvents.consumeDamaged(player.getUUID());
+        CombatEvents.consumeFought(player.getUUID());
         player.level().playSound(null, player.blockPosition(), SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.PLAYERS, 1.0f, 1.0f);
     }
 
@@ -85,7 +85,7 @@ public final class ChargeManager {
             Active active = entry.getValue();
             ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
             boolean present = player != null && player.isAlive() && !player.hasDisconnected();
-            boolean damaged = CombatEvents.consumeDamaged(entry.getKey());
+            boolean damaged = CombatEvents.consumeFought(entry.getKey());
             Vec3 delta = present ? player.position().subtract(active.start()) : Vec3.ZERO;
             Optional<StationRecord> target = network.get(active.target());
             ChargeOutcome outcome = active.session().tick(new TickInput(present, damaged, delta.x, delta.y, delta.z,
@@ -136,14 +136,17 @@ public final class ChargeManager {
     }
 
     private static void complete(ServerPlayer player, StationRecord target, int cost) {
-        RequestResult result = RequestValidator.validateCompletion(player.experienceLevel, player.isCreative(), cost);
+        boolean present = TeleportExecutor.targetBlockPresent(player.server, target);
+        if (!present) StationNetwork.get(player.server).remove(target.id());
+        RequestResult result = RequestValidator.validateCompletion(player.experienceLevel, player.isCreative(), cost, present);
         if (result != RequestResult.OK) {
             player.displayClientMessage(message(result, 0, cost), true);
             cancelSound(player);
             return;
         }
         if (!TeleportExecutor.teleport(player, target)) {
-            player.displayClientMessage(Component.translatable(RequestResult.TARGET_OFFLINE.translationKey()).withStyle(ChatFormatting.RED), true);
+            player.displayClientMessage(Component.translatable("msg.nexusgate.no_safe_spot").withStyle(ChatFormatting.RED), true);
+            cancelSound(player);
             return;
         }
         if (!player.isCreative() && cost > 0) player.giveExperienceLevels(-cost);

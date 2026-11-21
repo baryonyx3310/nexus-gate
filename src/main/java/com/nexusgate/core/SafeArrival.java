@@ -1,5 +1,7 @@
 package com.nexusgate.core;
 
+import org.jetbrains.annotations.Nullable;
+
 /** Picks where a player lands next to a 2-tall station. */
 public final class SafeArrival {
     @FunctionalInterface
@@ -7,16 +9,24 @@ public final class SafeArrival {
         boolean test(int x, int z);
     }
 
-    /** South, north, east, west. */
-    private static final int[][] SIDES = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
+    /** Sides (S, N, E, W), then diagonals, then the radius-2 ring sides. */
+    private static final int[][] CANDIDATES = {
+            {0, 1}, {0, -1}, {1, 0}, {-1, 0},
+            {1, 1}, {-1, 1}, {1, -1}, {-1, -1},
+            {0, 2}, {0, -2}, {2, 0}, {-2, 0}};
 
     private SafeArrival() {}
 
-    /** @return {offsetX, offsetZ, offsetY}; {0, 0, 2} (on top) when no side is free. */
-    public static int[] pick(IntBinaryPredicate free) {
-        for (int[] side : SIDES) {
-            if (free.test(side[0], side[1])) return new int[]{side[0], side[1], 0};
+    /**
+     * @param free    whether the column at (x, z) offset is safe to stand in
+     * @param topFree whether standing on top of the station is safe
+     * @return {offsetX, offsetZ, offsetY}, or null when no safe spot exists
+     */
+    @Nullable
+    public static int[] pick(IntBinaryPredicate free, boolean topFree) {
+        for (int[] c : CANDIDATES) {
+            if (free.test(c[0], c[1])) return new int[]{c[0], c[1], 0};
         }
-        return new int[]{0, 0, 2};
+        return topFree ? new int[]{0, 0, 2} : null;
     }
 }

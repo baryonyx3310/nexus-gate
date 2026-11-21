@@ -1,0 +1,143 @@
+{
+  "textures": {
+    "base": "nexusgate:block/station_base",
+    "side": "nexusgate:block/station_side",
+    "core": "nexusgate:block/station_core",
+    "top": "nexusgate:block/station_top",
+    "particle": "nexusgate:block/station_side"
+  },
+  "elements": [
+    {
+      "from": [
+        1,
+        0,
+        1
+      ],
+      "to": [
+        15,
+        3,
+        15
+      ],
+      "faces": {
+        "north": {
+          "texture": "#base"
+        },
+        "south": {
+          "texture": "#base"
+        },
+        "east": {
+          "texture": "#base"
+        },
+        "west": {
+          "texture": "#base"
+        },
+        "up": {
+          "texture": "#top"
+        },
+        "down": {
+          "texture": "#base"
+        }
+      }
+    },
+    {
+      "from": [
+        3,
+        3,
+        3
+      ],
+      "to": [
+        13,
+        16,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#side"
+        },
+        "south": {
+          "texture": "#side"
+        },
+        "east": {
+          "texture": "#side"
+        },
+        "west": {
+          "texture": "#side"
+        }
+      }
+    },
+    {
+      "from": [
+        6,
+        4,
+        2.9
+      ],
+      "to": [
+        10,
+        16,
+        13.1
+      ],
+      "faces": {
+        "north": {
+          "texture": "#core",
+          "uv": [
+            6,
+            0,
+            10,
+            12
+          ]
+        },
+        "south": {
+          "texture": "#core",
+          "uv": [
+            6,
+            0,
+            10,
+            12
+          ]
+        }
+      },
+      "neoforge_data": {
+        "block_light": 15,
+        "sky_light": 15,
+        "ambient_occlusion": false
+      }
+    },
+    {
+      "from": [
+        2.9,
+        4,
+        6
+      ],
+      "to": [
+        13.1,
+        16,
+        10
+      ],
+      "faces": {
+        "east": {
+          "texture": "#core",
+          "uv": [
+            6,
+            0,
+            10,
+            12
+          ]
+        },
+        "west": {
+          "texture": "#core",
+          "uv": [
+            6,
+            0,
+            10,
+            12
+          ]
+        }
+      },
+      "neoforge_data": {
+        "block_light": 15,
+        "sky_light": 15,
+        "ambient_occlusion": false
+      }
+    }
+  ]
+}

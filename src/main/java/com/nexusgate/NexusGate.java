@@ -3,6 +3,11 @@ package com.nexusgate;
 import com.mojang.logging.LogUtils;
 import com.nexusgate.config.NexusConfig;
 import com.nexusgate.registry.ModAttachments;
+import com.nexusgate.registry.ModBlockEntities;
+import com.nexusgate.registry.ModBlocks;
+import com.nexusgate.registry.ModComponents;
+import com.nexusgate.registry.ModCreativeTab;
+import com.nexusgate.registry.ModItems;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -15,6 +20,11 @@ public final class NexusGate {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public NexusGate(IEventBus modBus, ModContainer container) {
+        ModBlocks.REGISTER.register(modBus);
+        ModItems.REGISTER.register(modBus);
+        ModBlockEntities.REGISTER.register(modBus);
+        ModComponents.REGISTER.register(modBus);
+        ModCreativeTab.REGISTER.register(modBus);
         ModAttachments.REGISTER.register(modBus);
         container.registerConfig(ModConfig.Type.SERVER, NexusConfig.SPEC);
     }

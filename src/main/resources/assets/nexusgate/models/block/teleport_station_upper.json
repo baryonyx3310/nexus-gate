@@ -1,0 +1,242 @@
+{
+  "textures": {
+    "base": "nexusgate:block/station_base",
+    "side": "nexusgate:block/station_side",
+    "core": "nexusgate:block/station_core",
+    "top": "nexusgate:block/station_top",
+    "particle": "nexusgate:block/station_side"
+  },
+  "elements": [
+    {
+      "from": [
+        4,
+        0,
+        4
+      ],
+      "to": [
+        12,
+        10,
+        12
+      ],
+      "faces": {
+        "north": {
+          "texture": "#side"
+        },
+        "south": {
+          "texture": "#side"
+        },
+        "east": {
+          "texture": "#side"
+        },
+        "west": {
+          "texture": "#side"
+        }
+      }
+    },
+    {
+      "from": [
+        6,
+        0,
+        3.9
+      ],
+      "to": [
+        10,
+        9,
+        12.1
+      ],
+      "faces": {
+        "north": {
+          "texture": "#core",
+          "uv": [
+            6,
+            4,
+            10,
+            13
+          ]
+        },
+        "south": {
+          "texture": "#core",
+          "uv": [
+            6,
+            4,
+            10,
+            13
+          ]
+        }
+      },
+      "neoforge_data": {
+        "block_light": 15,
+        "sky_light": 15,
+        "ambient_occlusion": false
+      }
+    },
+    {
+      "from": [
+        3.9,
+        0,
+        6
+      ],
+      "to": [
+        12.1,
+        9,
+        10
+      ],
+      "faces": {
+        "east": {
+          "texture": "#core",
+          "uv": [
+            6,
+            4,
+            10,
+            13
+          ]
+        },
+        "west": {
+          "texture": "#core",
+          "uv": [
+            6,
+            4,
+            10,
+            13
+          ]
+        }
+      },
+      "neoforge_data": {
+        "block_light": 15,
+        "sky_light": 15,
+        "ambient_occlusion": false
+      }
+    },
+    {
+      "from": [
+        2,
+        10,
+        2
+      ],
+      "to": [
+        14,
+        12,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#base"
+        },
+        "south": {
+          "texture": "#base"
+        },
+        "east": {
+          "texture": "#base"
+        },
+        "west": {
+          "texture": "#base"
+        },
+        "up": {
+          "texture": "#top"
+        },
+        "down": {
+          "texture": "#base"
+        }
+      }
+    },
+    {
+      "from": [
+        7,
+        12,
+        7
+      ],
+      "to": [
+        9,
+        15,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#side"
+        },
+        "south": {
+          "texture": "#side"
+        },
+        "east": {
+          "texture": "#side"
+        },
+        "west": {
+          "texture": "#side"
+        }
+      }
+    },
+    {
+      "from": [
+        6.5,
+        15,
+        6.5
+      ],
+      "to": [
+        9.5,
+        16.5,
+        9.5
+      ],
+      "faces": {
+        "north": {
+          "texture": "#core",
+          "uv": [
+            6,
+            0,
+            9,
+            3
+          ]
+        },
+        "south": {
+          "texture": "#core",
+          "uv": [
+            6,
+            0,
+            9,
+            3
+          ]
+        },
+        "east": {
+          "texture": "#core",
+          "uv": [
+            6,
+            0,
+            9,
+            3
+          ]
+        },
+        "west": {
+          "texture": "#core",
+          "uv": [
+            6,
+            0,
+            9,
+            3
+          ]
+        },
+        "up": {
+          "texture": "#core",
+          "uv": [
+            6,
+            0,
+            9,
+            3
+          ]
+        },
+        "down": {
+          "texture": "#core",
+          "uv": [
+            6,
+            0,
+            9,
+            3
+          ]
+        }
+      },
+      "neoforge_data": {
+        "block_light": 15,
+        "sky_light": 15,
+        "ambient_occlusion": false
+      }
+    }
+  ]
+}

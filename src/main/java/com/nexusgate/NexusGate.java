@@ -2,6 +2,7 @@ package com.nexusgate;
 
 import com.mojang.logging.LogUtils;
 import com.nexusgate.config.NexusConfig;
+import com.nexusgate.registry.ModAttachments;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -14,6 +15,7 @@ public final class NexusGate {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public NexusGate(IEventBus modBus, ModContainer container) {
+        ModAttachments.REGISTER.register(modBus);
         container.registerConfig(ModConfig.Type.SERVER, NexusConfig.SPEC);
     }
 }

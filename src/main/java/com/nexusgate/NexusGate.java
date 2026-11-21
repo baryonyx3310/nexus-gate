@@ -9,7 +9,10 @@ import com.nexusgate.registry.ModBlocks;
 import com.nexusgate.registry.ModComponents;
 import com.nexusgate.registry.ModCreativeTab;
 import com.nexusgate.registry.ModItems;
+import com.nexusgate.teleport.ChargeManager;
+import com.nexusgate.teleport.CombatEvents;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
@@ -29,5 +32,11 @@ public final class NexusGate {
         ModAttachments.REGISTER.register(modBus);
         container.registerConfig(ModConfig.Type.SERVER, NexusConfig.SPEC);
         modBus.addListener(Payloads::register);
+
+        NeoForge.EVENT_BUS.addListener(ChargeManager::onServerTick);
+        NeoForge.EVENT_BUS.addListener(ChargeManager::onServerStopped);
+        NeoForge.EVENT_BUS.addListener(CombatEvents::onDamage);
+        NeoForge.EVENT_BUS.addListener(CombatEvents::onLogout);
+        NeoForge.EVENT_BUS.addListener(CombatEvents::onServerStopped);
     }
 }

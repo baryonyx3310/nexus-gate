@@ -1,6 +1,8 @@
 package com.nexusgate.teleport;
 
+import com.nexusgate.NexusGate;
 import com.nexusgate.block.TeleportStationBlockEntity;
+import com.nexusgate.core.Permissions;
 import com.nexusgate.config.NexusConfig;
 import com.nexusgate.core.CombatLock;
 import com.nexusgate.core.StationEntry;
@@ -78,8 +80,43 @@ public final class StationService {
         player.displayClientMessage(Component.translatable("msg.nexusgate.renamed", name).withStyle(ChatFormatting.AQUA), true);
     }
 
-    /** Completed by the public-stations task. */
+    /** Handles the OP-only toggle from the terminal; permission is re-checked here. */
     public static void setPublic(ServerPlayer player, UUID stationId, boolean value) {
+        Optional<StationRecord> found = StationNetwork.get(player.server).get(stationId);
+        if (found.isEmpty()) return;
+        if (!canManagePublic(player)) {
+            NexusGate.LOGGER.warn("Player {} tried to change public state of station {} without permission",
+                    player.getGameProfile().getName(), stationId);
+            player.displayClientMessage(Component.translatable("msg.nexusgate.no_permission").withStyle(ChatFormatting.RED), true);
+            return;
+        }
+        applyPublic(player, found.get(), value);
+    }
+
+    public static void applyPublic(ServerPlayer player, StationRecord record, boolean value) {
+        StationNetwork.get(player.server).update(record.withPublic(value));
+        String key = value ? "msg.nexusgate.now_public" : "msg.nexusgate.now_private";
+        player.displayClientMessage(Component.translatable(key, record.name()).withStyle(ChatFormatting.GOLD), true);
+    }
+
+    public static boolean canManagePublic(ServerPlayer player) {
+        return Permissions.canSetPublic(permissionLevel(player), NexusConfig.publicPermissionLevel());
+    }
+
+    private static int permissionLevel(ServerPlayer player) {
+        for (int level = 4; level > 0; level--) {
+            if (player.hasPermissions(level)) return level;
+        }
+        return 0;
+    }
+
+    /** Public stations can only be broken by players allowed to manage them. */
+    public static boolean mayBreak(ServerLevel level, BlockPos lowerPos, ServerPlayer player) {
+        return stationAt(level, lowerPos).map(r -> !r.isPublic() || canManagePublic(player)).orElse(true);
+    }
+
+    public static boolean isPublicAt(ServerLevel level, BlockPos lowerPos) {
+        return stationAt(level, lowerPos).map(StationRecord::isPublic).orElse(false);
     }
 
     /** @return the trimmed name without formatting codes, or null if empty or too long. */
@@ -90,7 +127,7 @@ public final class StationService {
     }
 
     public static boolean canRename(ServerPlayer player, StationRecord record) {
-        return record.owner().equals(player.getUUID()) || player.hasPermissions(NexusConfig.publicPermissionLevel());
+        return record.owner().equals(player.getUUID()) || canManagePublic(player);
     }
 
     public static boolean isKnown(ServerPlayer player, StationRecord record) {
@@ -138,7 +175,7 @@ public final class StationService {
         int combat = CombatLock.remainingTicks(CombatEvents.lastCombat(player.getUUID()), player.server.overworld().getGameTime(),
                 NexusConfig.chargeSettings().combatLockSeconds());
         PacketDistributor.sendToPlayer(player, new OpenSelectionPayload(source.id().toString(), source.name(),
-                canRename(player, source), player.hasPermissions(NexusConfig.publicPermissionLevel()), source.isPublic(),
+                canRename(player, source), canManagePublic(player), source.isPublic(),
                 combat, StationSorter.sort(entries, currentDim)));
     }
 }

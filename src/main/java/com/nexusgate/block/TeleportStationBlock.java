@@ -4,7 +4,11 @@ import com.mojang.serialization.MapCodec;
 import com.nexusgate.teleport.StationService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.Explosion;
+import net.neoforged.neoforge.event.level.BlockEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
@@ -147,6 +151,26 @@ public class TeleportStationBlock extends HorizontalDirectionalBlock implements 
         double y = pos.getY() + 0.4 + random.nextDouble() * 1.4;
         double z = pos.getZ() + 0.5 + (random.nextDouble() - 0.5) * 0.7;
         level.addParticle(ParticleTypes.ELECTRIC_SPARK, x, y, z, 0, 0.02, 0);
+    }
+
+    /** Public stations are immune to explosions. */
+    @Override
+    public float getExplosionResistance(BlockState state, BlockGetter level, BlockPos pos, Explosion explosion) {
+        if (level instanceof ServerLevel serverLevel && StationService.isPublicAt(serverLevel, lowerPos(state, pos))) {
+            return 3_600_000f;
+        }
+        return super.getExplosionResistance(state, level, pos, explosion);
+    }
+
+    /** Cancels breaking a public station by a player without admin permission. */
+    public static void onBreak(BlockEvent.BreakEvent event) {
+        BlockState state = event.getState();
+        if (!(state.getBlock() instanceof TeleportStationBlock)) return;
+        if (event.getLevel() instanceof ServerLevel level && event.getPlayer() instanceof ServerPlayer player
+                && !StationService.mayBreak(level, lowerPos(state, event.getPos()), player)) {
+            event.setCanceled(true);
+            player.displayClientMessage(Component.translatable("msg.nexusgate.protected").withStyle(ChatFormatting.RED), true);
+        }
     }
 
     @Nullable

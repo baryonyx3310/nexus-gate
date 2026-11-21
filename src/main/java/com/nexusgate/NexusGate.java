@@ -1,6 +1,8 @@
 package com.nexusgate;
 
 import com.mojang.logging.LogUtils;
+import com.nexusgate.block.TeleportStationBlock;
+import com.nexusgate.command.NexusCommand;
 import com.nexusgate.config.NexusConfig;
 import com.nexusgate.net.Payloads;
 import com.nexusgate.registry.ModAttachments;
@@ -38,5 +40,7 @@ public final class NexusGate {
         NeoForge.EVENT_BUS.addListener(CombatEvents::onDamage);
         NeoForge.EVENT_BUS.addListener(CombatEvents::onLogout);
         NeoForge.EVENT_BUS.addListener(CombatEvents::onServerStopped);
+        NeoForge.EVENT_BUS.addListener(TeleportStationBlock::onBreak);
+        NeoForge.EVENT_BUS.addListener(NexusCommand::register);
     }
 }

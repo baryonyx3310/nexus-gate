@@ -15,6 +15,11 @@ tasks.named('wrapper', Wrapper).configure {
 }
 
 version = mod_version
+
+// OneDrive locks files inside synced folders; set NEXUSGATE_BUILD_DIR to build outside it.
+if (System.getenv('NEXUSGATE_BUILD_DIR')) {
+    layout.buildDirectory = file(System.getenv('NEXUSGATE_BUILD_DIR'))
+}
 group = mod_group_id
 
 sourceSets.main.resources {

@@ -2,6 +2,7 @@ package com.nexusgate;
 
 import com.mojang.logging.LogUtils;
 import com.nexusgate.config.NexusConfig;
+import com.nexusgate.net.Payloads;
 import com.nexusgate.registry.ModAttachments;
 import com.nexusgate.registry.ModBlockEntities;
 import com.nexusgate.registry.ModBlocks;
@@ -27,5 +28,6 @@ public final class NexusGate {
         ModCreativeTab.REGISTER.register(modBus);
         ModAttachments.REGISTER.register(modBus);
         container.registerConfig(ModConfig.Type.SERVER, NexusConfig.SPEC);
+        modBus.addListener(Payloads::register);
     }
 }

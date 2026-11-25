@@ -74,3 +74,10 @@ As texturas e os JSONs são gerados por `python tools/gen_textures.py` e `python
 - [ ] Um jogador **sem OP** não vê o botão de pública e não consegue quebrar uma estação pública.
 - [ ] O Localizador mostra seta e distância. Quebrando a estação, ele mostra "Sinal perdido".
 - [ ] Com o Xaero's Minimap instalado, o waypoint aparece ao sincronizar. Se não aparecer, procure "Xaero" no log.
+
+## Licença
+
+Copyright (C) 2026 Lucas Viana.
+
+Distribuído sob a [GNU LGPL v3.0](LICENSE), que complementa a [GNU GPL v3.0](COPYING). Você pode usar o mod em modpacks e criar addons que dependam dele. Se redistribuir uma versão modificada, mantenha os créditos e publique o código da modificação sob a mesma licença.
+

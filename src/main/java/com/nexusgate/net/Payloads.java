@@ -22,6 +22,10 @@ public final class Payloads {
                 (p, ctx) -> com.nexusgate.client.ClientPayloadHandlers.openRename(p));
         r.playToClient(XaeroWaypointPayload.TYPE, XaeroWaypointPayload.STREAM_CODEC,
                 (p, ctx) -> com.nexusgate.client.ClientPayloadHandlers.xaeroWaypoint(p));
+        r.playToClient(CombatLockPayload.TYPE, CombatLockPayload.STREAM_CODEC,
+                (p, ctx) -> com.nexusgate.client.ClientPayloadHandlers.combatLock(p));
+        r.playToClient(GateFxPayload.TYPE, GateFxPayload.STREAM_CODEC,
+                (p, ctx) -> com.nexusgate.client.ClientPayloadHandlers.gateFx(p));
 
         r.playToServer(SelectStationPayload.TYPE, SelectStationPayload.STREAM_CODEC, (p, ctx) -> {
             if (ctx.player() instanceof ServerPlayer player) ChargeManager.requestStart(player, p.source(), p.target());
@@ -31,6 +35,9 @@ public final class Payloads {
         });
         r.playToServer(SetPublicPayload.TYPE, SetPublicPayload.STREAM_CODEC, (p, ctx) -> {
             if (ctx.player() instanceof ServerPlayer player) StationService.setPublic(player, p.station(), p.value());
+        });
+        r.playToServer(SetIconPayload.TYPE, SetIconPayload.STREAM_CODEC, (p, ctx) -> {
+            if (ctx.player() instanceof ServerPlayer player) StationService.setIcon(player, p.station(), p.icon());
         });
     }
 }

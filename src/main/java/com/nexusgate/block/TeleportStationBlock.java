@@ -5,7 +5,6 @@ import com.nexusgate.teleport.StationService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.ChatFormatting;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.Explosion;
 import net.neoforged.neoforge.event.level.BlockEvent;
@@ -25,7 +24,10 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import com.nexusgate.registry.ModBlockEntities;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -42,13 +44,14 @@ public class TeleportStationBlock extends HorizontalDirectionalBlock implements 
     public static final MapCodec<TeleportStationBlock> CODEC = simpleCodec(TeleportStationBlock::new);
     public static final EnumProperty<DoubleBlockHalf> HALF = BlockStateProperties.DOUBLE_BLOCK_HALF;
 
+    // Plinth + drum body (lower), drum/arch + crown + emitter (upper); matches the housing silhouette.
     private static final VoxelShape LOWER_SHAPE = Shapes.or(
-            Block.box(1, 0, 1, 15, 3, 15),
-            Block.box(3, 3, 3, 13, 16, 13));
+            Block.box(0, 0, 0, 16, 3, 16),
+            Block.box(0, 3, 2, 16, 16, 15));
     private static final VoxelShape UPPER_SHAPE = Shapes.or(
-            Block.box(4, 0, 4, 12, 10, 12),
-            Block.box(2, 10, 2, 14, 12, 14),
-            Block.box(7, 12, 7, 9, 16, 9));
+            Block.box(0, 0, 2, 16, 10, 15),
+            Block.box(3, 10, 3, 13, 13, 13),
+            Block.box(6.5, 13, 6.5, 9.5, 16, 9.5));
 
     public TeleportStationBlock(Properties properties) {
         super(properties);
@@ -146,11 +149,9 @@ public class TeleportStationBlock extends HorizontalDirectionalBlock implements 
 
     @Override
     public void animateTick(BlockState state, Level level, BlockPos pos, RandomSource random) {
-        if (state.getValue(HALF) != DoubleBlockHalf.LOWER || random.nextInt(3) != 0) return;
-        double x = pos.getX() + 0.5 + (random.nextDouble() - 0.5) * 0.7;
-        double y = pos.getY() + 0.4 + random.nextDouble() * 1.4;
-        double z = pos.getZ() + 0.5 + (random.nextDouble() - 0.5) * 0.7;
-        level.addParticle(ParticleTypes.ELECTRIC_SPARK, x, y, z, 0, 0.02, 0);
+        if (state.getValue(HALF) != DoubleBlockHalf.LOWER || random.nextInt(4) != 0) return;
+        // Client-only custom VFX (soft motes rising from the vents); class loaded only on the client.
+        com.nexusgate.client.fx.TeleportFxController.idleStation(pos, random);
     }
 
     /** Public stations are immune to explosions. */
@@ -171,6 +172,15 @@ public class TeleportStationBlock extends HorizontalDirectionalBlock implements 
             event.setCanceled(true);
             player.displayClientMessage(Component.translatable("msg.nexusgate.protected").withStyle(ChatFormatting.RED), true);
         }
+    }
+
+    @Nullable
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+        if (level.isClientSide() || state.getValue(HALF) != DoubleBlockHalf.LOWER
+                || type != ModBlockEntities.TELEPORT_STATION.get()) return null;
+        return (lvl, pos, st, be) -> TeleportStationBlockEntity.serverTick(lvl, pos, st, (TeleportStationBlockEntity) be);
     }
 
     @Nullable

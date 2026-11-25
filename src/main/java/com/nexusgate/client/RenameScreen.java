@@ -3,14 +3,13 @@ package com.nexusgate.client;
 import com.nexusgate.net.OpenRenamePayload;
 import com.nexusgate.net.RenameStationPayload;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
-/** Terminal-styled screen to name a station. */
+/** Gate-styled screen to name a station. */
 public class RenameScreen extends Screen {
     private static final int PANEL_W = 240;
     private static final int PANEL_H = 90;
@@ -37,8 +36,8 @@ public class RenameScreen extends Screen {
         nameBox.setTextColor(Terminal.CYAN_BRIGHT);
         addRenderableWidget(nameBox);
         setInitialFocus(nameBox);
-        addRenderableWidget(Button.builder(Component.translatable("screen.nexusgate.confirm"), b -> confirm())
-                .bounds(left + PANEL_W / 2 - 50, top + PANEL_H - 28, 100, 20).build());
+        addRenderableWidget(new com.nexusgate.client.gui.TechButton(left + PANEL_W / 2 - 50, top + PANEL_H - 28, 100, 18,
+                Component.translatable("screen.nexusgate.confirm"), 0x33F0FF, b -> confirm()));
     }
 
     private void confirm() {
@@ -73,7 +72,7 @@ public class RenameScreen extends Screen {
         super.render(g, mouseX, mouseY, partialTick);
         int left = (width - PANEL_W) / 2;
         int top = (height - PANEL_H) / 2;
-        g.drawString(font, "> NEXUS GATE // " + title.getString(), left + 10, top + 10, Terminal.CYAN, false);
+        g.drawString(font, "NEXUS GATE // " + title.getString().toUpperCase(java.util.Locale.ROOT), left + 12, top + 9, 0xFF16191E, false);
     }
 
     @Override

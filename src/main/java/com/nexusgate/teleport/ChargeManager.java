@@ -5,7 +5,6 @@ import com.nexusgate.core.ChargeOutcome;
 import com.nexusgate.core.ChargeRules;
 import com.nexusgate.core.ChargeSession;
 import com.nexusgate.core.ChargeSettings;
-import com.nexusgate.core.CombatLock;
 import com.nexusgate.core.RequestResult;
 import com.nexusgate.core.RequestValidator;
 import com.nexusgate.core.TeleportRequest;
@@ -14,7 +13,7 @@ import com.nexusgate.core.XpCost;
 import com.nexusgate.station.StationNetwork;
 import com.nexusgate.station.StationRecord;
 import net.minecraft.ChatFormatting;
-import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -35,7 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** Owns charging sessions: starts them after validation, ticks them, completes or cancels them. */
 public final class ChargeManager {
-    private record Active(UUID source, UUID target, ChargeSession session, Vec3 start, int xpCost) {}
+    private record Active(UUID source, UUID target, ChargeSession session, Vec3 start, int xpCost, BlockPos station) {}
 
     private static final Map<UUID, Active> SESSIONS = new ConcurrentHashMap<>();
 
@@ -53,15 +52,16 @@ public final class ChargeManager {
         boolean targetExists = target.isPresent() && server.getLevel(target.get().dimension()) != null;
         boolean known = target.isPresent() && StationService.isKnown(player, target.get());
         boolean cross = targetExists && !target.get().dimension().equals(player.level().dimension());
-        int combat = CombatLock.remainingTicks(CombatEvents.lastCombat(player.getUUID()), server.overworld().getGameTime(),
-                settings.combatLockSeconds());
+        int combat = CombatEvents.remainingTicks(player.getUUID(), server.overworld().getGameTime());
         int cost = targetExists ? XpCost.levels(cross ? 0 : StationService.distanceTo(player, target.get()), cross,
                 NexusConfig.xpSettings()) : 0;
 
         RequestResult result = RequestValidator.validateStart(new TeleportRequest(sourceHere, distanceToSource, targetExists,
                 known, sourceId.equals(targetId), cross, combat, player.experienceLevel, player.isCreative(), cost), settings);
         if (result != RequestResult.OK) {
-            player.displayClientMessage(message(result, combat, cost), true);
+            Component reason = message(result, combat, cost);
+            player.displayClientMessage(reason, true);
+            GateFx.reject(player, reason);
             return;
         }
 
@@ -69,8 +69,10 @@ public final class ChargeManager {
         int hostiles = player.level().getEntitiesOfClass(Mob.class, player.getBoundingBox().inflate(radius),
                 mob -> mob instanceof Enemy && mob.isAlive()).size();
         int ticks = ChargeRules.chargeTicks(hostiles, cross, settings);
+        BlockPos stationPos = source.get().pos();
         SESSIONS.put(player.getUUID(), new Active(sourceId, targetId, new ChargeSession(ticks, settings.maxMoveDistance()),
-                player.position(), cost));
+                player.position(), cost, stationPos));
+        GateFx.start(player, stationPos, ticks);
         CombatEvents.consumeFought(player.getUUID());
         player.level().playSound(null, player.blockPosition(), SoundEvents.RESPAWN_ANCHOR_CHARGE, SoundSource.PLAYERS, 1.0f, 1.0f);
     }
@@ -95,11 +97,11 @@ public final class ChargeManager {
                 case CONTINUE -> charging(player, active.session());
                 case COMPLETE -> {
                     it.remove();
-                    complete(player, target.orElseThrow(), active.xpCost());
+                    complete(player, target.orElseThrow(), active.xpCost(), active.station());
                 }
                 default -> {
                     it.remove();
-                    if (present) cancelled(player);
+                    if (present) cancelled(player, active.station());
                 }
             }
         }
@@ -113,48 +115,45 @@ public final class ChargeManager {
         return SESSIONS.containsKey(player);
     }
 
+    /** Visuals are animated client-side from the START event; the server only keeps the rising hum. */
     private static void charging(ServerPlayer player, ChargeSession session) {
-        ServerLevel level = player.serverLevel();
         int elapsed = session.elapsed();
         float progress = (float) elapsed / session.total();
-        double angle = elapsed * 0.45;
-        double height = (elapsed % 30) / 30.0 * 2.0;
-        for (int arm = 0; arm < 2; arm++) {
-            double a = angle + arm * Math.PI;
-            level.sendParticles(ParticleTypes.ELECTRIC_SPARK, player.getX() + Math.cos(a) * 0.8, player.getY() + height,
-                    player.getZ() + Math.sin(a) * 0.8, 1, 0, 0, 0, 0);
-        }
-        if (elapsed % 4 == 0) {
-            level.sendParticles(ParticleTypes.END_ROD, player.getX(), player.getY() + 0.1, player.getZ(), 2, 0.3, 0, 0.3, 0.02);
-        }
         if (elapsed % 20 == 0) {
-            level.playSound(null, player.blockPosition(), SoundEvents.BEACON_AMBIENT, SoundSource.PLAYERS, 1.0f, 0.5f + 1.5f * progress);
-        }
-        if (elapsed % 2 == 0) {
-            player.displayClientMessage(Component.literal(ChargeRules.progressBar(elapsed, session.total())).withStyle(ChatFormatting.AQUA), true);
+            player.level().playSound(null, player.blockPosition(), SoundEvents.BEACON_AMBIENT, SoundSource.PLAYERS, 1.0f, 0.5f + 1.5f * progress);
         }
     }
 
-    private static void complete(ServerPlayer player, StationRecord target, int cost) {
+    private static void complete(ServerPlayer player, StationRecord target, int cost, BlockPos station) {
         boolean present = TeleportExecutor.targetBlockPresent(player.server, target);
         if (!present) StationNetwork.get(player.server).remove(target.id());
         RequestResult result = RequestValidator.validateCompletion(player.experienceLevel, player.isCreative(), cost, present);
         if (result != RequestResult.OK) {
-            player.displayClientMessage(message(result, 0, cost), true);
+            Component reason = message(result, 0, cost);
+            player.displayClientMessage(reason, true);
+            GateFx.cancel(player, station, reason);
             cancelSound(player);
             return;
         }
+        ServerLevel origin = player.serverLevel();
+        Vec3 from = player.position();
         if (!TeleportExecutor.teleport(player, target)) {
-            player.displayClientMessage(Component.translatable("msg.nexusgate.no_safe_spot").withStyle(ChatFormatting.RED), true);
+            Component reason = Component.translatable("msg.nexusgate.no_safe_spot").withStyle(ChatFormatting.RED);
+            player.displayClientMessage(reason, true);
+            GateFx.cancel(player, station, reason);
             cancelSound(player);
             return;
         }
+        GateFx.depart(player, origin, from, station);
+        GateFx.arrive(player, player.serverLevel(), target.pos());
         if (!player.isCreative() && cost > 0) player.giveExperienceLevels(-cost);
         player.displayClientMessage(Component.translatable("msg.nexusgate.arrived", target.name()).withStyle(ChatFormatting.AQUA), true);
     }
 
-    private static void cancelled(ServerPlayer player) {
-        player.displayClientMessage(Component.translatable("msg.nexusgate.interrupted").withStyle(ChatFormatting.RED), true);
+    private static void cancelled(ServerPlayer player, BlockPos station) {
+        Component reason = Component.translatable("msg.nexusgate.interrupted").withStyle(ChatFormatting.RED);
+        player.displayClientMessage(reason, true);
+        GateFx.cancel(player, station, reason);
         cancelSound(player);
     }
 

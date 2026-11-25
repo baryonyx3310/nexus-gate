@@ -5,7 +5,6 @@ import com.nexusgate.block.TeleportStationBlock;
 import com.nexusgate.block.TeleportStationBlockEntity;
 import com.nexusgate.core.Permissions;
 import com.nexusgate.config.NexusConfig;
-import com.nexusgate.core.CombatLock;
 import com.nexusgate.core.StationEntry;
 import com.nexusgate.core.StationSorter;
 import com.nexusgate.core.XpCost;
@@ -19,6 +18,7 @@ import com.nexusgate.station.StationRecord;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -36,6 +36,8 @@ import java.util.UUID;
 /** Server-side station lifecycle: placing, using, removing, renaming. */
 public final class StationService {
     public static final int MAX_NAME_LENGTH = 32;
+    /** Number of selectable station icons; must match the client-side StationIcons.COUNT. */
+    public static final int ICON_COUNT = 12;
 
     private StationService() {}
 
@@ -48,6 +50,7 @@ public final class StationService {
 
     public static InteractionResult onUse(ServerLevel level, BlockPos lowerPos, ServerPlayer player) {
         StationRecord record = stationAt(level, lowerPos).orElseGet(() -> register(level, lowerPos, player));
+        syncDisplay(level.getServer(), record);
         boolean known = record.isPublic() || ActivatedStations.isActivated(player, record.id());
         if (!known) {
             ActivatedStations.activate(player, record.id());
@@ -79,8 +82,29 @@ public final class StationService {
             player.displayClientMessage(Component.translatable("msg.nexusgate.invalid_name").withStyle(ChatFormatting.RED), true);
             return;
         }
-        network.update(record.withName(name));
+        StationRecord renamed = record.withName(name);
+        network.update(renamed);
+        syncDisplay(player.server, renamed);
         player.displayClientMessage(Component.translatable("msg.nexusgate.renamed", name).withStyle(ChatFormatting.AQUA), true);
+    }
+
+    /** Sets the station's icon (owner or OP, same rule as renaming). */
+    public static void setIcon(ServerPlayer player, UUID stationId, int icon) {
+        StationNetwork network = StationNetwork.get(player.server);
+        Optional<StationRecord> found = network.get(stationId);
+        if (found.isEmpty() || icon < 0 || icon >= ICON_COUNT) return;
+        if (!canRename(player, found.get())) {
+            player.displayClientMessage(Component.translatable("msg.nexusgate.no_permission").withStyle(ChatFormatting.RED), true);
+            return;
+        }
+        network.update(found.get().withIcon(icon));
+    }
+
+    /** Pushes the station name to its block entity (shown on the crown screen), if the chunk is loaded. */
+    public static void syncDisplay(MinecraftServer server, StationRecord record) {
+        ServerLevel level = server.getLevel(record.dimension());
+        if (level == null || !level.isLoaded(record.pos())) return;
+        if (level.getBlockEntity(record.pos()) instanceof TeleportStationBlockEntity be) be.setDisplayName(record.name());
     }
 
     /** Handles the OP-only toggle from the terminal; permission is re-checked here. */
@@ -162,7 +186,10 @@ public final class StationService {
         StationRecord record = new StationRecord(UUID.randomUUID(), defaultName, level.dimension(), lowerPos.immutable(),
                 owner.getUUID(), false);
         StationNetwork.get(level.getServer()).add(record);
-        if (level.getBlockEntity(lowerPos) instanceof TeleportStationBlockEntity be) be.setStationId(record.id());
+        if (level.getBlockEntity(lowerPos) instanceof TeleportStationBlockEntity be) {
+            be.setStationId(record.id());
+            be.setDisplayName(record.name());
+        }
         return record;
     }
 
@@ -185,12 +212,11 @@ public final class StationService {
             int cost = XpCost.levels(Math.max(0, distance), cross, xp);
             boolean affordable = player.isCreative() || player.experienceLevel >= cost;
             entries.add(new StationEntry(r.id().toString(), r.name(), r.dimension().location().toString(), r.isPublic(),
-                    distance, cost, affordable));
+                    distance, cost, affordable, r.icon()));
         }
-        int combat = CombatLock.remainingTicks(CombatEvents.lastCombat(player.getUUID()), player.server.overworld().getGameTime(),
-                NexusConfig.chargeSettings().combatLockSeconds());
+        int combat = CombatEvents.remainingTicks(player.getUUID(), player.server.overworld().getGameTime());
         PacketDistributor.sendToPlayer(player, new OpenSelectionPayload(source.id().toString(), source.name(),
-                canRename(player, source), canManagePublic(player), source.isPublic(),
+                canRename(player, source), canManagePublic(player), source.isPublic(), source.icon(),
                 combat, StationSorter.sort(entries, currentDim)));
     }
 }

@@ -14,6 +14,9 @@ public final class NexusConfig {
     private static final ModConfigSpec.IntValue MAX_CHARGE_SECONDS;
     private static final ModConfigSpec.IntValue CROSS_DIMENSION_EXTRA_SECONDS;
     private static final ModConfigSpec.IntValue COMBAT_LOCK_SECONDS;
+    private static final ModConfigSpec.IntValue HURT_LOCK_MIN_SECONDS;
+    private static final ModConfigSpec.IntValue HURT_LOCK_MAX_SECONDS;
+    private static final ModConfigSpec.DoubleValue HURT_LOCK_FULL_DAMAGE;
     private static final ModConfigSpec.DoubleValue MAX_MOVE_DISTANCE;
     private static final ModConfigSpec.DoubleValue STATION_USE_RANGE;
     private static final ModConfigSpec.BooleanValue ALLOW_CROSS_DIMENSION;
@@ -37,8 +40,14 @@ public final class NexusConfig {
                 .defineInRange("maxChargeSeconds", 12, 0, 60);
         CROSS_DIMENSION_EXTRA_SECONDS = b.comment("Extra seconds of charge when changing dimension.")
                 .defineInRange("crossDimensionExtraSeconds", 3, 0, 60);
-        COMBAT_LOCK_SECONDS = b.comment("Seconds after taking or dealing damage during which a teleport cannot start.")
+        COMBAT_LOCK_SECONDS = b.comment("Seconds after dealing damage during which a teleport cannot start.")
                 .defineInRange("combatLockSeconds", 10, 0, 60);
+        HURT_LOCK_MIN_SECONDS = b.comment("Seconds of teleport lock after taking a tiny amount of damage.")
+                .defineInRange("hurtLockMinSeconds", 5, 0, 60);
+        HURT_LOCK_MAX_SECONDS = b.comment("Seconds of teleport lock after taking hurtLockFullDamage or more in one hit.")
+                .defineInRange("hurtLockMaxSeconds", 15, 0, 120);
+        HURT_LOCK_FULL_DAMAGE = b.comment("Damage of a single hit (2 = one heart) that gives the maximum lock; smaller hits scale linearly.")
+                .defineInRange("hurtLockFullDamage", 20.0, 0.5, 1000.0);
         MAX_MOVE_DISTANCE = b.comment("Moving further than this many blocks from the start position cancels the charge.")
                 .defineInRange("maxMoveDistance", 1.5, 0.0, 16.0);
         STATION_USE_RANGE = b.comment("Maximum distance in blocks from the source station to start a teleport.")
@@ -77,6 +86,12 @@ public final class NexusConfig {
     }
 
     public static int hostileRadius() { return HOSTILE_RADIUS.get(); }
+
+    public static int hurtLockMinSeconds() { return HURT_LOCK_MIN_SECONDS.get(); }
+
+    public static int hurtLockMaxSeconds() { return HURT_LOCK_MAX_SECONDS.get(); }
+
+    public static float hurtLockFullDamage() { return HURT_LOCK_FULL_DAMAGE.get().floatValue(); }
 
     public static int publicPermissionLevel() { return PUBLIC_STATION_PERMISSION_LEVEL.get(); }
 }

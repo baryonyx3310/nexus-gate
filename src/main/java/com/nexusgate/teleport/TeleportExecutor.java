@@ -5,7 +5,6 @@ import com.nexusgate.core.SafeArrival;
 import com.nexusgate.station.StationRecord;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -38,7 +37,7 @@ public final class TeleportExecutor {
         ServerLevel level = player.server.getLevel(target.dimension());
         if (level == null) return false;
         BlockPos base = target.pos();
-        int[] offset = SafeArrival.pick((x, z) -> isSafeColumn(level, base.offset(x, 0, z)), isSafeTop(level, base.above(2)));
+        int[] offset = arrivalOffset(level, base);
         if (offset == null) return false;
         BlockPos dest = base.offset(offset[0], offset[2], offset[1]);
         float yaw = offset[2] == 0 ? (float) Math.toDegrees(Math.atan2(offset[0], -offset[1])) : player.getYRot();
@@ -47,12 +46,19 @@ public final class TeleportExecutor {
         player.teleportTo(level, dest.getX() + 0.5, dest.getY(), dest.getZ() + 0.5, yaw, player.getXRot());
         player.resetFallDistance();
 
-        level.sendParticles(ParticleTypes.REVERSE_PORTAL, dest.getX() + 0.5, dest.getY() + 1.0, dest.getZ() + 0.5,
-                40, 0.4, 0.8, 0.4, 0.05);
-        level.sendParticles(ParticleTypes.ELECTRIC_SPARK, dest.getX() + 0.5, dest.getY() + 1.0, dest.getZ() + 0.5,
-                20, 0.5, 1.0, 0.5, 0.1);
+        // Arrival visuals are sent by ChargeManager through GateFx (client-side custom VFX).
         level.playSound(null, dest, SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0f, 1.2f);
         return true;
+    }
+
+    /** @return {dx, dz, dy} of the arrival spot next to the station at {@code base}, or null if none is safe. */
+    private static int[] arrivalOffset(ServerLevel level, BlockPos base) {
+        return SafeArrival.pick((x, z) -> isSafeColumn(level, base.offset(x, 0, z)), isSafeTop(level, base.above(2)));
+    }
+
+    /** Whether a player teleporting to the station at {@code base} (lower half) would find a safe spot. */
+    public static boolean hasSafeArrival(ServerLevel level, BlockPos base) {
+        return arrivalOffset(level, base) != null;
     }
 
     /** Feet and head passable and harmless, solid harmless floor below. */

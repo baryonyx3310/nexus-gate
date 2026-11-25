@@ -5,6 +5,9 @@ Run from the project root:  python tools/gen_assets.py
 import copy
 import json
 import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 RES = os.path.join(os.path.dirname(__file__), "..", "src", "main", "resources")
 NS = "nexusgate"
@@ -19,76 +22,25 @@ def write(rel, data):
         f.write("\n")
 
 
-def box(frm, to, tex, faces=("north", "south", "east", "west", "up", "down"), uv=None, glow=False, up=None, down=None):
-    el = {"from": frm, "to": to, "faces": {}}
-    for face in faces:
-        t = tex
-        if face == "up" and up:
-            t = up
-        if face == "down" and down:
-            t = down
-        f = {"texture": t}
-        if uv:
-            f["uv"] = uv
-        el["faces"][face] = f
-    if glow:
-        el["neoforge_data"] = GLOW
-    return el
-
-
-TEXTURES = {
-    "base": f"{NS}:block/station_base",
-    "side": f"{NS}:block/station_side",
-    "core": f"{NS}:block/station_core",
-    "top": f"{NS}:block/station_top",
-    "particle": f"{NS}:block/station_side",
-}
-
-LOWER = [
-    box([1, 0, 1], [15, 3, 15], "#base", up="#top"),
-    box([3, 3, 3], [13, 16, 13], "#side", faces=("north", "south", "east", "west")),
-    box([6, 4, 2.9], [10, 16, 13.1], "#core", faces=("north", "south"), uv=[6, 0, 10, 12], glow=True),
-    box([2.9, 4, 6], [13.1, 16, 10], "#core", faces=("east", "west"), uv=[6, 0, 10, 12], glow=True),
-]
-
-UPPER = [
-    box([4, 0, 4], [12, 10, 12], "#side", faces=("north", "south", "east", "west")),
-    box([6, 0, 3.9], [10, 9, 12.1], "#core", faces=("north", "south"), uv=[6, 4, 10, 13], glow=True),
-    box([3.9, 0, 6], [12.1, 9, 10], "#core", faces=("east", "west"), uv=[6, 4, 10, 13], glow=True),
-    box([2, 10, 2], [14, 12, 14], "#base", up="#top", down="#base"),
-    box([7, 12, 7], [9, 15, 9], "#side", faces=("north", "south", "east", "west")),
-    # Kept within y <= 16 so the combined item model (upper shifted by 16) stays inside the 32 limit.
-    box([6.5, 15, 6.5], [9.5, 16, 9.5], "#core", uv=[6, 0, 9, 3], glow=True),
-]
-
-
-def shifted(elements, dy):
-    out = copy.deepcopy(elements)
-    for el in out:
-        el["from"][1] += dy
-        el["to"][1] += dy
-    return out
+from station_model import ITEM_DISPLAY, LOWER, PARTICLES, TEXTURES, UPPER  # noqa: E402
 
 
 def models():
     write(f"assets/{NS}/models/block/teleport_station_lower.json", {"textures": TEXTURES, "elements": LOWER})
     write(f"assets/{NS}/models/block/teleport_station_upper.json", {"textures": TEXTURES, "elements": UPPER})
+    # The item is drawn by StationItemRenderer (both halves + the animated drum).
     write(f"assets/{NS}/models/item/teleport_station.json", {
-        "textures": TEXTURES,
-        "elements": copy.deepcopy(LOWER) + shifted(UPPER, 16),
-        "display": {
-            "gui": {"rotation": [30, 225, 0], "translation": [0, -3, 0], "scale": [0.4, 0.4, 0.4]},
-            "ground": {"rotation": [0, 0, 0], "translation": [0, 2, 0], "scale": [0.25, 0.25, 0.25]},
-            "fixed": {"rotation": [0, 0, 0], "translation": [0, -3, 0], "scale": [0.4, 0.4, 0.4]},
-            "thirdperson_righthand": {"rotation": [75, 45, 0], "translation": [0, 1.5, 1], "scale": [0.3, 0.3, 0.3]},
-            "firstperson_righthand": {"rotation": [0, 45, 0], "translation": [0, 0, 0], "scale": [0.3, 0.3, 0.3]},
-            "firstperson_lefthand": {"rotation": [0, 225, 0], "translation": [0, 0, 0], "scale": [0.3, 0.3, 0.3]},
-        },
+        "parent": "minecraft:builtin/entity",
+        "textures": {"particle": f"{NS}:block/frame_graphite"},
+        "gui_light": "side",
+        "display": ITEM_DISPLAY,
     })
     write(f"assets/{NS}/models/item/locator.json", {
         "parent": "minecraft:item/generated",
         "textures": {"layer0": f"{NS}:item/locator"},
     })
+    for name in PARTICLES:
+        write(f"assets/{NS}/particles/{name}.json", {"textures": [f"{NS}:{name}"]})
 
 
 def blockstate():
@@ -199,6 +151,33 @@ LANG = {
     "screen.nexusgate.distance": ("%s m", "%s m"),
     "screen.nexusgate.xp": ("%s XP", "%s XP"),
     "screen.nexusgate.free": ("grátis", "free"),
+    "screen.nexusgate.select_destination": ("SELECIONE UM DESTINO", "SELECT A DESTINATION"),
+    "screen.nexusgate.select_hint": ("Clique numa câmara do tambor. Depois, ative o núcleo.", "Click a drum chamber, then engage the core."),
+    "nexusgate.configuration.showSelectHint": ("Mostrar dica de destino", "Show destination hint"),
+    "screen.nexusgate.logo": ("Logo", "Logo"),
+    "icon.nexusgate.pin": ("Marcador", "Pin"),
+    "icon.nexusgate.house": ("Casa", "House"),
+    "icon.nexusgate.base": ("Base", "Base"),
+    "icon.nexusgate.skull": ("Perigo", "Danger"),
+    "icon.nexusgate.mine": ("Mina", "Mine"),
+    "icon.nexusgate.farm": ("Fazenda", "Farm"),
+    "icon.nexusgate.portal": ("Portal", "Portal"),
+    "icon.nexusgate.tree": ("Floresta", "Forest"),
+    "icon.nexusgate.chest": ("Loja", "Shop"),
+    "icon.nexusgate.sword": ("Arena", "Arena"),
+    "icon.nexusgate.star": ("Favorito", "Favorite"),
+    "icon.nexusgate.anchor": ("Porto", "Harbor"),
+    "screen.nexusgate.engage": ("[ ATIVAR NÚCLEO ]", "[ ENGAGE CORE ]"),
+    "screen.nexusgate.engage_now": ("▶ ATIVAR NÚCLEO ◀", "▶ ENGAGE CORE ◀"),
+    "screen.nexusgate.status.charging": ("SINCRONIZANDO %s%%", "SYNCHRONIZING %s%%"),
+    "screen.nexusgate.status.awaiting": ("AGUARDANDO A ESTAÇÃO…", "AWAITING STATION…"),
+    "screen.nexusgate.status.interference": ("INTERFERÊNCIA", "INTERFERENCE"),
+    "screen.nexusgate.status.no_xp": ("XP INSUFICIENTE", "NOT ENOUGH XP"),
+    "screen.nexusgate.dimension": ("DIM", "DIM"),
+    "screen.nexusgate.distance_label": ("DIST", "DIST"),
+    "screen.nexusgate.cost_label": ("CUSTO", "COST"),
+    "screen.nexusgate.page": ("CILINDRO %s/%s", "CYLINDER %s/%s"),
+    "screen.nexusgate.public_short": ("PÚBLICA", "PUBLIC"),
     # commands
     "commands.nexusgate.public.usage": ("/nexusgate public <true|false>", "/nexusgate public <true|false>"),
 }

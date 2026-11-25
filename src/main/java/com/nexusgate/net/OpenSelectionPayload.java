@@ -13,7 +13,8 @@ import java.util.List;
 
 /** Server → client: open the station selection terminal. */
 public record OpenSelectionPayload(String sourceId, String sourceName, boolean canRename, boolean isOp,
-                                   boolean sourcePublic, int combatRemainingTicks, List<StationEntry> entries)
+                                   boolean sourcePublic, int sourceIcon, int combatRemainingTicks,
+                                   List<StationEntry> entries)
         implements CustomPacketPayload {
 
     public static final Type<OpenSelectionPayload> TYPE =
@@ -28,6 +29,7 @@ public record OpenSelectionPayload(String sourceId, String sourceName, boolean c
         buf.writeBoolean(p.canRename);
         buf.writeBoolean(p.isOp);
         buf.writeBoolean(p.sourcePublic);
+        buf.writeVarInt(p.sourceIcon);
         buf.writeVarInt(p.combatRemainingTicks);
         buf.writeVarInt(p.entries.size());
         for (StationEntry e : p.entries) writeEntry(buf, e);
@@ -39,11 +41,12 @@ public record OpenSelectionPayload(String sourceId, String sourceName, boolean c
         boolean canRename = buf.readBoolean();
         boolean isOp = buf.readBoolean();
         boolean sourcePublic = buf.readBoolean();
+        int sourceIcon = buf.readVarInt();
         int combat = buf.readVarInt();
         int size = buf.readVarInt();
         List<StationEntry> entries = new ArrayList<>(size);
         for (int i = 0; i < size; i++) entries.add(readEntry(buf));
-        return new OpenSelectionPayload(sourceId, sourceName, canRename, isOp, sourcePublic, combat, entries);
+        return new OpenSelectionPayload(sourceId, sourceName, canRename, isOp, sourcePublic, sourceIcon, combat, entries);
     }
 
     private static void writeEntry(FriendlyByteBuf buf, StationEntry e) {
@@ -54,11 +57,12 @@ public record OpenSelectionPayload(String sourceId, String sourceName, boolean c
         buf.writeDouble(e.distance());
         buf.writeVarInt(e.xpCost());
         buf.writeBoolean(e.affordable());
+        buf.writeVarInt(e.icon());
     }
 
     private static StationEntry readEntry(FriendlyByteBuf buf) {
         return new StationEntry(buf.readUtf(), buf.readUtf(), buf.readUtf(), buf.readBoolean(), buf.readDouble(),
-                buf.readVarInt(), buf.readBoolean());
+                buf.readVarInt(), buf.readBoolean(), buf.readVarInt());
     }
 
     @Override

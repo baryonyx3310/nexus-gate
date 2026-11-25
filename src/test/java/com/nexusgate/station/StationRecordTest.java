@@ -14,6 +14,16 @@ class StationRecordTest {
         assertEquals(r, StationRecord.load(r.save()));
     }
 
+    @Test void record_iconRoundTripsAndDefaultsToPin() {
+        var r = new StationRecord(UUID.randomUUID(), "Casa", Level.OVERWORLD, BlockPos.ZERO, UUID.randomUUID(), false).withIcon(3);
+        assertEquals(3, StationRecord.load(r.save()).icon());
+        var legacy = r.save();
+        legacy.remove("Icon");
+        assertEquals(0, StationRecord.load(legacy).icon());
+        assertEquals(3, r.withName("B").icon());
+        assertEquals(3, r.withPublic(true).icon());
+    }
+
     @Test void record_withersReturnCopies() {
         var r = new StationRecord(UUID.randomUUID(), "A", Level.OVERWORLD, BlockPos.ZERO, UUID.randomUUID(), false);
         assertEquals("B", r.withName("B").name());

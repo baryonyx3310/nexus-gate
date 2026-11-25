@@ -9,8 +9,13 @@ import net.minecraft.world.level.Level;
 
 import java.util.UUID;
 
-/** One station in the network. pos is the lower half. */
-public record StationRecord(UUID id, String name, ResourceKey<Level> dimension, BlockPos pos, UUID owner, boolean isPublic) {
+/** One station in the network. pos is the lower half; icon indexes the station icons (0 = pin). */
+public record StationRecord(UUID id, String name, ResourceKey<Level> dimension, BlockPos pos, UUID owner, boolean isPublic,
+                            int icon) {
+
+    public StationRecord(UUID id, String name, ResourceKey<Level> dimension, BlockPos pos, UUID owner, boolean isPublic) {
+        this(id, name, dimension, pos, owner, isPublic, 0);
+    }
 
     public CompoundTag save() {
         CompoundTag tag = new CompoundTag();
@@ -20,6 +25,7 @@ public record StationRecord(UUID id, String name, ResourceKey<Level> dimension, 
         tag.putLong("Pos", pos.asLong());
         tag.putUUID("Owner", owner);
         tag.putBoolean("Public", isPublic);
+        tag.putInt("Icon", icon);
         return tag;
     }
 
@@ -30,14 +36,19 @@ public record StationRecord(UUID id, String name, ResourceKey<Level> dimension, 
                 ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(tag.getString("Dimension"))),
                 BlockPos.of(tag.getLong("Pos")),
                 tag.getUUID("Owner"),
-                tag.getBoolean("Public"));
+                tag.getBoolean("Public"),
+                tag.getInt("Icon"));
     }
 
     public StationRecord withName(String newName) {
-        return new StationRecord(id, newName, dimension, pos, owner, isPublic);
+        return new StationRecord(id, newName, dimension, pos, owner, isPublic, icon);
     }
 
     public StationRecord withPublic(boolean value) {
-        return new StationRecord(id, name, dimension, pos, owner, value);
+        return new StationRecord(id, name, dimension, pos, owner, value, icon);
+    }
+
+    public StationRecord withIcon(int value) {
+        return new StationRecord(id, name, dimension, pos, owner, isPublic, value);
     }
 }

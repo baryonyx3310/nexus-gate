@@ -2,11 +2,11 @@ package com.nexusgate.client.fx;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.nexusgate.client.render.LensRenderer;
 import com.nexusgate.client.render.ModRenderTypes;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
@@ -14,8 +14,10 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 /**
- * World-space teleport VFX drawn with the custom shaders: holographic rings around the traveller, the beam
- * from the station core, the light column, and the rift / collapse / re-forming bursts.
+ * World-space relocation VFX drawn with the custom shaders: the space-time lenses (real refraction of the frame),
+ * the connection beam from the core to the traveller, the orbital uplink from the crown, the sky beam coming down
+ * at the destination, the reconstruction beam, the spatial rifts at the cores and the quantum fluctuations.
+ * Timing comes from {@link RelocationTimeline}.
  */
 public final class WorldFxRenderer {
     private static final int CYAN = TeleportFxController.CYAN;
@@ -27,8 +29,7 @@ public final class WorldFxRenderer {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
-        boolean any = TeleportFxController.charges().iterator().hasNext() || TeleportFxController.bursts().iterator().hasNext();
-        if (!any) return;
+        if (!TeleportFxController.anyActive()) return;
 
         Camera camera = event.getCamera();
         Vec3 cam = camera.getPosition();
@@ -42,78 +43,162 @@ public final class WorldFxRenderer {
         Vector3f right = new Vector3f(1, 0, 0).rotate(camera.rotation());
         Vector3f up = new Vector3f(0, 1, 0).rotate(camera.rotation());
 
+        // Space-time distortion first: it refracts the finished frame, then the energy is drawn on top.
+        buffers.endBatch();
+        collectLenses(mc, cam, partial);
+        LensRenderer.flush(m, right, up);
+
         VertexConsumer field = buffers.getBuffer(ModRenderTypes.FIELD);
+        // Origin: core → traveller connection, then the crown fires the orbital uplink.
         for (TeleportFxController.Charge c : TeleportFxController.charges()) {
-            boolean local = mc.player != null && mc.player.getId() == c.entityId && mc.options.getCameraType().isFirstPerson();
-            float p = c.progress(partial);
-            Vec3 at = c.position(partial);
-            chargeRings(field, m, at, p, seconds, local);
-            beam(field, m, cam, core(c.station), at.add(0, 1.0, 0), 0.08f + 0.12f * p, argb(0.35f + 0.6f * p, CYAN), seconds);
-            float col = smooth(0.7f, 1f, p);
-            if (col > 0 && !local) column(field, m, at, 0.45f + 0.15f * col, 2.6f, argb(col, CYAN), 10);
+            float t = c.progress(partial);
+            Vec3 core = TeleportFxController.core(c.station);
+            // The beam always ends on the focal point, which slides back along it into the core in phase D.
+            Vec3 focal = TeleportFxController.focal(c.entityId, partial);
+            float reach = RelocationTimeline.beamReach(t);
+            float glow = RelocationTimeline.beamIntensity(t);
+            if (reach > 0f && glow > 0f) {
+                float d = RelocationTimeline.dissolve(t);
+                beam(field, m, cam, core, core.lerp(focal, reach), 0.06f + 0.08f * d, argb(glow * (0.55f + 0.45f * d), CYAN), seconds);
+            }
+            float u = RelocationTimeline.uplink(t);
+            if (u > 0f) uplink(field, m, TeleportFxController.crown(c.station), u, seconds, CYAN);
         }
         for (TeleportFxController.Burst b : TeleportFxController.bursts()) {
             float age = b.age(partial);
             if (age > 1f) continue;
-            Vec3 at = b.pos();
             switch (b.kind()) {
                 case DEPART -> {
-                    float k = 1f - age;
-                    column(field, m, at, 0.6f * k * k + 0.03f, 3.2f, argb(k, 0xCFFBFF), 12);
-                    flatRing(field, m, at.add(0, 0.05, 0), 0.4f + age * 3f, 0.25f, argb(k * k, CYAN), seconds * 4f, 40);
-                }
-                case ARRIVE -> {
-                    float k = 1f - age;
-                    column(field, m, at, 0.15f + 0.5f * age, 2.8f * k + 0.2f, argb(k * 0.9f, CYAN), 12);
-                    for (int i = 0; i < 3; i++) {
-                        float r = 0.3f + age * (1.2f + i * 0.5f);
-                        flatRing(field, m, at.add(0, 0.3 + i * 0.7, 0), r, 0.12f, argb(k * k, CYAN), seconds * (i % 2 == 0 ? 3 : -3), 32);
-                    }
+                    // The transmission leaves: the orbital beam flares and dies away.
+                    float k = RelocationTimeline.release(b.ticksSince(partial));
+                    Vec3 crown = TeleportFxController.crown(b.station());
+                    columnFade(field, m, crown, 0.08f + 0.3f * k, TeleportFxController.SKY_HEIGHT, argb(k, 0xCFFBFF), argb(0f, CYAN));
+                    flatRing(field, m, crown, 0.3f + age * 2.5f, 0.18f, argb(k, CYAN), seconds * 4f, 32);
                 }
                 case CANCEL -> {
                     float k = 1f - age;
                     for (int i = 0; i < 3; i++) {
-                        flatRing(field, m, at.add(0, 0.2 + i * 0.75 - age * 0.3, 0), 0.9f * k, 0.1f, argb(k, RED), seconds * 6f, 32);
+                        flatRing(field, m, b.pos().add(0, 0.2 + i * 0.75 - age * 0.3, 0), 0.9f * k, 0.1f, argb(k, RED), seconds * 6f, 32);
                     }
                 }
             }
         }
+        // Destination: the sky beam comes down, the core wakes, the core reaches the arrival spot.
+        for (TeleportFxController.Reception r : TeleportFxController.receptions()) {
+            float a = r.age(partial);
+            Vec3 crown = TeleportFxController.crown(r.station());
+            float reach = RelocationTimeline.skyReach(a);
+            float sky = RelocationTimeline.skyIntensity(a);
+            if (sky > 0f && reach > 0f) {
+                float h = TeleportFxController.SKY_HEIGHT * reach;
+                Vec3 front = crown.add(0, TeleportFxController.SKY_HEIGHT - h, 0);
+                columnFade(field, m, front, 0.1f + 0.1f * sky, h, argb(sky, 0xCFFBFF), argb(sky * 0.15f, CYAN));
+                if (reach >= 1f) uplink(field, m, crown, sky * 0.8f, seconds, CYAN);
+            }
+            float rebuild = RelocationTimeline.rebuildIntensity(a);
+            float rr = RelocationTimeline.rebuildReach(a);
+            if (rebuild > 0f && rr > 0f) {
+                Vec3 core = TeleportFxController.core(r.station());
+                Vec3 focal = TeleportFxController.focal(r.entityId(), partial);
+                float built = 1f - RelocationTimeline.reconstruct(a);
+                beam(field, m, cam, core, core.lerp(focal, rr), 0.14f - 0.08f * built, argb(rebuild, CYAN), seconds);
+            }
+        }
         buffers.endBatch(ModRenderTypes.FIELD);
 
+        // Spatial distortion: the core folds space as matter is sent off, and again as it is received.
         VertexConsumer rift = buffers.getBuffer(ModRenderTypes.RIFT);
         for (TeleportFxController.Burst b : TeleportFxController.bursts()) {
             float age = b.age(partial);
-            if (age > 1f || b.kind() == TeleportFxController.BurstKind.CANCEL) continue;
-            boolean local = mc.player != null && b.kind() == TeleportFxController.BurstKind.ARRIVE
-                    && b.pos().distanceToSqr(mc.player.position()) < 1.0 && mc.options.getCameraType().isFirstPerson();
-            if (local) continue;
-            float size = b.kind() == TeleportFxController.BurstKind.DEPART
-                    ? 1.4f * (1f - age) * (1f - age) + 0.1f
-                    : 1.3f * Mth.sin(Mth.PI * Math.min(1f, age * 1.3f));
-            billboard(rift, m, b.pos().add(0, 1.0, 0), right, up, size, argb(1f - age * age, CYAN));
+            if (age > 1f || b.kind() != TeleportFxController.BurstKind.DEPART) continue;
+            float size = 0.9f * (1f - age) * (1f - age) + 0.05f;
+            billboard(rift, m, TeleportFxController.core(b.station()), right, up, size, argb(1f - age * age, CYAN));
+        }
+        for (TeleportFxController.Reception r : TeleportFxController.receptions()) {
+            float a = r.age(partial);
+            float k = smooth(6f, 12f, a) * (1f - smooth(16f, 26f, a));
+            if (k > 0f) billboard(rift, m, TeleportFxController.core(r.station()), right, up, 0.8f * k, argb(k, CYAN));
         }
         buffers.endBatch(ModRenderTypes.RIFT);
+
+        // Quantum fluctuations, over everything else.
+        if (QuantumFx.any()) {
+            QuantumFx.render(buffers.getBuffer(ModRenderTypes.FRAGMENT), m, partial);
+            buffers.endBatch(ModRenderTypes.FRAGMENT);
+        }
         pose.popPose();
     }
 
-    private static Vec3 core(BlockPos station) {
-        return new Vec3(station.getX() + 0.5, station.getY() + 1.0, station.getZ() + 0.5);
+    /**
+     * Where space bends this frame: around each body (growing with its instability and conversion), in the cores
+     * while they absorb or emit matter, along the beams, and around the larger fragments.
+     */
+    private static void collectLenses(Minecraft mc, Vec3 cam, float partial) {
+        boolean firstPerson = mc.options.getCameraType().isFirstPerson();
+        int self = mc.player != null ? mc.player.getId() : -1;
+        for (TeleportFxController.Charge c : TeleportFxController.charges()) {
+            float t = c.progress(partial);
+            Vec3 core = TeleportFxController.core(c.station);
+            Vec3 focal = TeleportFxController.focal(c.entityId, partial);
+            float seed = (c.entityId * 0.618f) % 1f;
+            // Your own body lens would fill the whole first-person view.
+            if (!(firstPerson && c.entityId == self)) {
+                focalLens(focal, cam, RelocationTimeline.dissolve(t), RelocationTimeline.bodyLens(t), seed);
+            }
+            LensRenderer.big(core, 0.9f, RelocationTimeline.coreLens(t), seed + 0.3f);
+            beamLenses(core, core.lerp(focal, RelocationTimeline.beamReach(t)), RelocationTimeline.beamIntensity(t), seed);
+        }
+        for (TeleportFxController.Burst b : TeleportFxController.bursts()) {
+            if (b.kind() != TeleportFxController.BurstKind.DEPART) continue;
+            LensRenderer.big(TeleportFxController.core(b.station()), 0.9f,
+                    RelocationTimeline.coreLensAfterDepart(b.ticksSince(partial)), 0.7f);
+        }
+        for (TeleportFxController.Reception r : TeleportFxController.receptions()) {
+            float a = r.age(partial);
+            Vec3 core = TeleportFxController.core(r.station());
+            Vec3 focal = TeleportFxController.focal(r.entityId(), partial);
+            float seed = (r.entityId() * 0.618f) % 1f;
+            if (!(firstPerson && r.entityId() == self)) {
+                focalLens(focal, cam, RelocationTimeline.reconstruct(a), RelocationTimeline.arrivalLens(a), seed);
+            }
+            LensRenderer.big(core, 0.9f, RelocationTimeline.receptionCoreLens(a), seed + 0.3f);
+            beamLenses(core, core.lerp(focal, RelocationTimeline.rebuildReach(a)), RelocationTimeline.rebuildIntensity(a), seed);
+        }
+        QuantumFx.forEachLens(48, partial, f -> LensRenderer.small(f.position(partial), f.size() * 3.5f, 0.45f, (f.size() * 37f) % 1f));
     }
 
-    /** Three segmented rings at feet / waist / head that counter-rotate and climb with progress. */
-    private static void chargeRings(VertexConsumer vc, Matrix4f m, Vec3 at, float p, float seconds, boolean local) {
-        for (int i = 0; i < 3; i++) {
-            if (local && i > 0) continue; // keep the first-person view clear; only the floor ring
-            float y = 0.08f + i * 0.85f + p * 0.25f;
-            float r = (0.95f - i * 0.12f) * (1f - 0.35f * smooth(0.8f, 1f, p));
-            float dir = i % 2 == 0 ? 1f : -1f;
-            float spin = seconds * dir * (0.8f + p * 5f);
-            int c = argb(0.25f + 0.65f * p, CYAN);
-            for (int s = 0; s < 3; s++) {
-                float a0 = spin + Mth.TWO_PI * s / 3f;
-                arc(vc, m, at.add(0, y, 0), r, 0.07f + 0.05f * p, a0, a0 + 1.6f, c, 16);
-            }
+    /**
+     * The convergent lens on the focal point. It tightens with the body: the more compressed the matter, the
+     * smaller the region space is pulled into (radius 1.35 → 0.55 blocks), while its strength keeps rising.
+     */
+    private static void focalLens(Vec3 focal, Vec3 cam, float compression, float strength, float seed) {
+        float radius = 0.55f + 0.8f * CollapseField.remainingSize(compression * 0.85f);
+        LensRenderer.big(towardCamera(focal, cam, 0.35 * radius), radius, strength, seed);
+    }
+
+    /** Weak lenses spaced along a beam: the energy being transferred bends the light around it. */
+    private static void beamLenses(Vec3 from, Vec3 to, float intensity, float seed) {
+        if (intensity <= 0.05f || from.distanceToSqr(to) < 0.25) return;
+        for (int i = 0; i < 5; i++) {
+            float k = 0.25f + i * 0.13f;
+            LensRenderer.small(from.lerp(to, k), 0.32f, 0.35f * intensity, (seed + i * 0.17f) % 1f);
         }
+    }
+
+    /** Moves a lens centre toward the camera so it sits in front of the body it bends. */
+    private static Vec3 towardCamera(Vec3 p, Vec3 cam, double by) {
+        Vec3 d = cam.subtract(p);
+        double len = d.length();
+        return len < 1e-3 ? p : p.add(d.scale(Math.min(by, len * 0.5) / len));
+    }
+
+    /** The crown lights up and the orbital beam climbs from it toward the sky. */
+    private static void uplink(VertexConsumer vc, Matrix4f m, Vec3 crown, float k, float seconds, int rgb) {
+        for (int i = 0; i < 2; i++) {
+            float dir = i == 0 ? 1f : -1f;
+            flatRing(vc, m, crown.add(0, 0.05 + i * 0.25, 0), 0.42f - i * 0.12f, 0.08f, argb(k, rgb), seconds * dir * (2f + 4f * k), 24);
+        }
+        columnFade(vc, m, crown, 0.06f + 0.1f * k, TeleportFxController.SKY_HEIGHT * smooth(0f, 0.6f, k), argb(k, rgb), argb(0f, rgb));
     }
 
     /** Horizontal ribbon arc (u along, v across). */
@@ -137,19 +222,19 @@ public final class WorldFxRenderer {
         arc(vc, m, c, r, w, spin, spin + Mth.TWO_PI, argb, seg);
     }
 
-    /** Vertical square column of light (open tube, axis-aligned like a beacon beam). */
-    private static void column(VertexConsumer vc, Matrix4f m, Vec3 base, float r, float h, int argb, int seg) {
-        seg = 4;
-        for (int i = 0; i < seg; i++) {
-            float t0 = Mth.TWO_PI * (i + 0.5f) / seg, t1 = Mth.TWO_PI * (i + 1.5f) / seg;
+    /** Tall square column whose colour fades from the base to the top (the orbital beam). */
+    private static void columnFade(VertexConsumer vc, Matrix4f m, Vec3 base, float r, float h, int bottom, int top) {
+        if (h <= 0.01f) return;
+        for (int i = 0; i < 4; i++) {
+            float t0 = Mth.TWO_PI * (i + 0.5f) / 4, t1 = Mth.TWO_PI * (i + 1.5f) / 4;
             float x0 = (float) base.x + Mth.cos(t0) * r, z0 = (float) base.z + Mth.sin(t0) * r;
             float x1 = (float) base.x + Mth.cos(t1) * r, z1 = (float) base.z + Mth.sin(t1) * r;
             float y0 = (float) base.y, y1 = y0 + h;
-            // u runs up the column, v across the facet: the shader's flow then rises.
-            vc.addVertex(m, x0, y0, z0).setUv(0, 0).setColor(argb);
-            vc.addVertex(m, x1, y0, z1).setUv(0, 1).setColor(argb);
-            vc.addVertex(m, x1, y1, z1).setUv(h, 1).setColor(argb);
-            vc.addVertex(m, x0, y1, z0).setUv(h, 0).setColor(argb);
+            // u runs up the column (one unit per block), so the shader's flow rises toward the sky.
+            vc.addVertex(m, x0, y0, z0).setUv(0, 0).setColor(bottom);
+            vc.addVertex(m, x1, y0, z1).setUv(0, 1).setColor(bottom);
+            vc.addVertex(m, x1, y1, z1).setUv(h, 1).setColor(top);
+            vc.addVertex(m, x0, y1, z0).setUv(h, 0).setColor(top);
         }
     }
 

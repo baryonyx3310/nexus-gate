@@ -69,7 +69,8 @@ public class StationRenderer implements BlockEntityRenderer<TeleportStationBlock
                 ? be.getBlockState().getValue(TeleportStationBlock.FACING) : Direction.NORTH;
         BlockPos pos = be.getBlockPos();
         TeleportFxController.Charge charge = TeleportFxController.chargeAt(pos);
-        float progress = charge != null ? charge.progress(partialTick) : -1f;
+        // Charging here, or receiving a transmission (the core and iris run the same animation, rising and settling).
+        float progress = charge != null ? charge.progress(partialTick) : TeleportFxController.receptionAt(pos, partialTick);
         float since = TeleportFxController.sinceDeparture(pos, partialTick);
         long gameTime = be.getLevel() != null ? be.getLevel().getGameTime() : 0;
         float seconds = (gameTime + partialTick) / 20f + (Math.floorMod(pos.hashCode(), 997) / 997f) * 7f;

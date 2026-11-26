@@ -4,6 +4,10 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.resources.ResourceLocation;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * World render types for the custom shaders. All are depth-tested but do not write depth, so glows layer
@@ -63,4 +67,34 @@ public final class ModRenderTypes {
                     .setCullState(RenderStateShard.NO_CULL)
                     .setDepthTestState(RenderStateShard.LEQUAL_DEPTH_TEST)
                     .createCompositeState(false));
+
+    /** Quantum fluctuation fragments: crossed planes, additive, shapes drawn by the shader. */
+    public static final RenderType FRAGMENT = RenderType.create("nexusgate_fragment", DefaultVertexFormat.POSITION_TEX_COLOR,
+            VertexFormat.Mode.QUADS, 16384, false, false, RenderType.CompositeState.builder()
+                    .setShaderState(new RenderStateShard.ShaderStateShard(ModShaders::fragment))
+                    .setTextureState(white())
+                    .setTransparencyState(RenderStateShard.LIGHTNING_TRANSPARENCY)
+                    .setWriteMaskState(RenderStateShard.COLOR_WRITE)
+                    .setCullState(RenderStateShard.NO_CULL)
+                    .setDepthTestState(RenderStateShard.LEQUAL_DEPTH_TEST)
+                    .createCompositeState(false));
+
+    private static final Map<ResourceLocation, RenderType> DISSOLVE = new HashMap<>();
+
+    /**
+     * A body texture redrawn by the matter dissolve shader: cutout, lit and depth-writing like the vanilla
+     * entity types, with the dissolve parameters in the vertex colour. One cached type per texture.
+     */
+    public static RenderType matterDissolve(ResourceLocation texture) {
+        return DISSOLVE.computeIfAbsent(texture, t -> RenderType.create("nexusgate_matter_dissolve",
+                DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 1536, true, false,
+                RenderType.CompositeState.builder()
+                        .setShaderState(new RenderStateShard.ShaderStateShard(ModShaders::dissolve))
+                        .setTextureState(new RenderStateShard.TextureStateShard(t, false, false))
+                        .setTransparencyState(RenderStateShard.NO_TRANSPARENCY)
+                        .setCullState(RenderStateShard.NO_CULL)
+                        .setLightmapState(RenderStateShard.LIGHTMAP)
+                        .setOverlayState(RenderStateShard.OVERLAY)
+                        .createCompositeState(true)));
+    }
 }

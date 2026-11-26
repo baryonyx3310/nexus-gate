@@ -1,10 +1,16 @@
-# Nexus Gate
+# Realocador Material Intra-Rede (RMIR)
 
 Mod de teleporte com estética tecnológica para **Minecraft 1.21.1 / NeoForge**. Viajar entre bases é cômodo. Usar o teleporte para fugir de uma luta não funciona.
 
+## Lore
+
+O maior avanço dessa civilização foi a **Matéria Suspensa**: matéria condensada por processos quânticos e guardada em regiões espalhadas pelo espaço e pela órbita da Terra. O **Drive Terminal Intra-Rede (DTIR)** é a infraestrutura que transforma informação e comandos em alterações físicas nessa matéria e a distribui pela rede orbital.
+
+O Realocador é o equipamento que liga o usuário ao DTIR. Ele não leva ninguém de um ponto a outro: converte o indivíduo em flutuações quânticas, transmite essas flutuações pela rede orbital e reconstrói o corpo no destino com Matéria Suspensa.
+
 ## Conteúdo
 
-- **Estação de Teleporte**: máquina de 2 blocos de altura com carcaça industrial (grafite e cerâmica). Na frente fica um tambor de revólver animado, com 8 câmaras, íris mecânica e núcleo de plasma.
+- **Realocador Material Intra-Rede** (o bloco que antes se chamava Estação de Teleporte): máquina de 2 blocos de altura com carcaça industrial (grafite e cerâmica). Na frente fica um tambor de revólver animado, com 8 câmaras, íris mecânica e núcleo de plasma.
   - Ao colocar, você escolhe o nome dela.
   - Clique direito numa estação nova sincroniza (ativa) ela para você.
   - Clique direito numa estação sincronizada abre o terminal de seleção.
@@ -57,8 +63,18 @@ As texturas e os JSONs são gerados por `python tools/gen_textures.py` e `python
 ## Visual
 
 - **Terminal radial**: a tela mostra a face do tambor. Escolha uma câmara (o tambor gira para a posição de disparo) e clique no núcleo para ativar. Durante a carga, a íris abre e, no último segundo, o núcleo se abre e a visão mergulha num túnel até sair do outro lado. A roda do mouse ou as setas trocam de cilindro quando há mais de 8 destinos. Enter ativa.
-- **VFX próprios**: shaders GLSL em `assets/nexusgate/shaders/core` (núcleo, campo de energia, túnel e fenda) e partículas próprias (faíscas, motes, estilhaços e anel de choque).
+- **Aviso de conexão**: no primeiro quarto da carga, a tela do tambor mostra "CONECTANDO COM A **INTRA**", em letras pretas com contorno vermelho. A palavra INTRA aparece maior e pulsando.
+- **Sequência de realocação no mundo**: é o que os outros jogadores veem, e você também, em terceira pessoa ou com a tela fechada.
+  1. **Instabilidade:** o núcleo acumula energia e um feixe sai dele até o peito do jogador, que vira o ponto focal. O espaço em volta começa a convergir para esse ponto: o fundo é puxado para dentro, num funil que gira, com ondulações correndo para o centro e separação de cores.
+  2. **Colapso:** a própria geometria do corpo é comprimida. Primeiro perde largura (mãos, cabeça e pés na frente), depois afunila e é puxada para a altura do ponto focal, até virar um ponto minúsculo. O corpo é desenhado o tempo todo e nunca some de uma vez; a matéria comprimida vira energia e a sombra encolhe junto.
+  3. **Flutuações quânticas:** fragmentos geométricos que mudam de forma, aparecem em posições fantasma, se dividem e se recombinam. Eles se desprendem dos vértices do corpo que está sendo comprimido, são atraídos para o ponto focal e descem pelo feixe até o núcleo. No fim, o próprio ponto desliza pelo feixe e é absorvido pelo núcleo.
+  4. **Transmissão:** a coroa acende e um feixe orbital sobe ao céu. Na partida, ele dá um clarão.
+  5. **Recepção:** no destino, um feixe desce do céu, o núcleo ativa e o espaço do ponto de chegada se distorce antes de qualquer matéria aparecer. O ponto sai do núcleo pelo feixe até o local de chegada, as flutuações se agrupam nele e o corpo se expande a partir do ponto até recuperar cabeça, tronco, braços e pernas. A distorção diminui conforme a matéria é reconstruída.
+
+  Tudo isso é só visual e segue os mesmos eventos de sempre do servidor. O jogador continua no lugar até o teleporte de verdade.
+- **VFX próprios**: shaders GLSL em `assets/nexusgate/shaders/core` (núcleo, campo de energia, túnel, fenda, conversão de matéria, lente espaço-temporal e flutuações quânticas) e partículas próprias (faíscas, motes, estilhaços e anel de choque).
 - Com shaderpacks (Iris/Oculus), os shaders próprios podem ficar com aparência diferente.
+- A distorção do espaço (refração real da imagem) é desligada sozinha com gráfico "Fabuloso" ou com um shaderpack ativo. O resto da animação continua.
 
 ## Checklist de teste no jogo
 

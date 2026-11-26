@@ -68,6 +68,17 @@ public final class ModRenderTypes {
                     .setDepthTestState(RenderStateShard.LEQUAL_DEPTH_TEST)
                     .createCompositeState(false));
 
+    /** Quantum fluctuation fragments: crossed planes, additive, shapes drawn by the shader. */
+    public static final RenderType FRAGMENT = RenderType.create("nexusgate_fragment", DefaultVertexFormat.POSITION_TEX_COLOR,
+            VertexFormat.Mode.QUADS, 16384, false, false, RenderType.CompositeState.builder()
+                    .setShaderState(new RenderStateShard.ShaderStateShard(ModShaders::fragment))
+                    .setTextureState(white())
+                    .setTransparencyState(RenderStateShard.LIGHTNING_TRANSPARENCY)
+                    .setWriteMaskState(RenderStateShard.COLOR_WRITE)
+                    .setCullState(RenderStateShard.NO_CULL)
+                    .setDepthTestState(RenderStateShard.LEQUAL_DEPTH_TEST)
+                    .createCompositeState(false));
+
     private static final Map<ResourceLocation, RenderType> DISSOLVE = new HashMap<>();
 
     /**

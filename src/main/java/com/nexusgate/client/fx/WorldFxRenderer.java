@@ -2,6 +2,7 @@ package com.nexusgate.client.fx;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.nexusgate.client.render.LensRenderer;
 import com.nexusgate.client.render.ModRenderTypes;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -13,9 +14,10 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 /**
- * World-space relocation VFX drawn with the custom shaders: the connection beam from the core to the traveller,
- * the orbital uplink from the crown, the sky beam coming down at the destination, the reconstruction beam, and
- * the spatial rifts at the cores. Timing comes from {@link RelocationTimeline}.
+ * World-space relocation VFX drawn with the custom shaders: the space-time lenses (real refraction of the frame),
+ * the connection beam from the core to the traveller, the orbital uplink from the crown, the sky beam coming down
+ * at the destination, the reconstruction beam, the spatial rifts at the cores and the quantum fluctuations.
+ * Timing comes from {@link RelocationTimeline}.
  */
 public final class WorldFxRenderer {
     private static final int CYAN = TeleportFxController.CYAN;
@@ -41,17 +43,23 @@ public final class WorldFxRenderer {
         Vector3f right = new Vector3f(1, 0, 0).rotate(camera.rotation());
         Vector3f up = new Vector3f(0, 1, 0).rotate(camera.rotation());
 
+        // Space-time distortion first: it refracts the finished frame, then the energy is drawn on top.
+        buffers.endBatch();
+        collectLenses(mc, cam, partial);
+        LensRenderer.flush(m, right, up);
+
         VertexConsumer field = buffers.getBuffer(ModRenderTypes.FIELD);
         // Origin: core → traveller connection, then the crown fires the orbital uplink.
         for (TeleportFxController.Charge c : TeleportFxController.charges()) {
             float t = c.progress(partial);
             Vec3 core = TeleportFxController.core(c.station);
-            Vec3 chest = c.position(partial).add(0, 1.0, 0);
+            // The beam always ends on the focal point, which slides back along it into the core in phase D.
+            Vec3 focal = TeleportFxController.focal(c.entityId, partial);
             float reach = RelocationTimeline.beamReach(t);
             float glow = RelocationTimeline.beamIntensity(t);
             if (reach > 0f && glow > 0f) {
                 float d = RelocationTimeline.dissolve(t);
-                beam(field, m, cam, core, core.lerp(chest, reach), 0.06f + 0.08f * d, argb(glow * (0.55f + 0.45f * d), CYAN), seconds);
+                beam(field, m, cam, core, core.lerp(focal, reach), 0.06f + 0.08f * d, argb(glow * (0.55f + 0.45f * d), CYAN), seconds);
             }
             float u = RelocationTimeline.uplink(t);
             if (u > 0f) uplink(field, m, TeleportFxController.crown(c.station), u, seconds, CYAN);
@@ -91,9 +99,9 @@ public final class WorldFxRenderer {
             float rr = RelocationTimeline.rebuildReach(a);
             if (rebuild > 0f && rr > 0f) {
                 Vec3 core = TeleportFxController.core(r.station());
-                Vec3 chest = r.body(partial).add(0, 1.0, 0);
+                Vec3 focal = TeleportFxController.focal(r.entityId(), partial);
                 float built = 1f - RelocationTimeline.reconstruct(a);
-                beam(field, m, cam, core, core.lerp(chest, rr), 0.14f - 0.08f * built, argb(rebuild, CYAN), seconds);
+                beam(field, m, cam, core, core.lerp(focal, rr), 0.14f - 0.08f * built, argb(rebuild, CYAN), seconds);
             }
         }
         buffers.endBatch(ModRenderTypes.FIELD);
@@ -112,7 +120,76 @@ public final class WorldFxRenderer {
             if (k > 0f) billboard(rift, m, TeleportFxController.core(r.station()), right, up, 0.8f * k, argb(k, CYAN));
         }
         buffers.endBatch(ModRenderTypes.RIFT);
+
+        // Quantum fluctuations, over everything else.
+        if (QuantumFx.any()) {
+            QuantumFx.render(buffers.getBuffer(ModRenderTypes.FRAGMENT), m, partial);
+            buffers.endBatch(ModRenderTypes.FRAGMENT);
+        }
         pose.popPose();
+    }
+
+    /**
+     * Where space bends this frame: around each body (growing with its instability and conversion), in the cores
+     * while they absorb or emit matter, along the beams, and around the larger fragments.
+     */
+    private static void collectLenses(Minecraft mc, Vec3 cam, float partial) {
+        boolean firstPerson = mc.options.getCameraType().isFirstPerson();
+        int self = mc.player != null ? mc.player.getId() : -1;
+        for (TeleportFxController.Charge c : TeleportFxController.charges()) {
+            float t = c.progress(partial);
+            Vec3 core = TeleportFxController.core(c.station);
+            Vec3 focal = TeleportFxController.focal(c.entityId, partial);
+            float seed = (c.entityId * 0.618f) % 1f;
+            // Your own body lens would fill the whole first-person view.
+            if (!(firstPerson && c.entityId == self)) {
+                focalLens(focal, cam, RelocationTimeline.dissolve(t), RelocationTimeline.bodyLens(t), seed);
+            }
+            LensRenderer.big(core, 0.9f, RelocationTimeline.coreLens(t), seed + 0.3f);
+            beamLenses(core, core.lerp(focal, RelocationTimeline.beamReach(t)), RelocationTimeline.beamIntensity(t), seed);
+        }
+        for (TeleportFxController.Burst b : TeleportFxController.bursts()) {
+            if (b.kind() != TeleportFxController.BurstKind.DEPART) continue;
+            LensRenderer.big(TeleportFxController.core(b.station()), 0.9f,
+                    RelocationTimeline.coreLensAfterDepart(b.ticksSince(partial)), 0.7f);
+        }
+        for (TeleportFxController.Reception r : TeleportFxController.receptions()) {
+            float a = r.age(partial);
+            Vec3 core = TeleportFxController.core(r.station());
+            Vec3 focal = TeleportFxController.focal(r.entityId(), partial);
+            float seed = (r.entityId() * 0.618f) % 1f;
+            if (!(firstPerson && r.entityId() == self)) {
+                focalLens(focal, cam, RelocationTimeline.reconstruct(a), RelocationTimeline.arrivalLens(a), seed);
+            }
+            LensRenderer.big(core, 0.9f, RelocationTimeline.receptionCoreLens(a), seed + 0.3f);
+            beamLenses(core, core.lerp(focal, RelocationTimeline.rebuildReach(a)), RelocationTimeline.rebuildIntensity(a), seed);
+        }
+        QuantumFx.forEachLens(48, partial, f -> LensRenderer.small(f.position(partial), f.size() * 3.5f, 0.45f, (f.size() * 37f) % 1f));
+    }
+
+    /**
+     * The convergent lens on the focal point. It tightens with the body: the more compressed the matter, the
+     * smaller the region space is pulled into (radius 1.35 → 0.55 blocks), while its strength keeps rising.
+     */
+    private static void focalLens(Vec3 focal, Vec3 cam, float compression, float strength, float seed) {
+        float radius = 0.55f + 0.8f * CollapseField.remainingSize(compression * 0.85f);
+        LensRenderer.big(towardCamera(focal, cam, 0.35 * radius), radius, strength, seed);
+    }
+
+    /** Weak lenses spaced along a beam: the energy being transferred bends the light around it. */
+    private static void beamLenses(Vec3 from, Vec3 to, float intensity, float seed) {
+        if (intensity <= 0.05f || from.distanceToSqr(to) < 0.25) return;
+        for (int i = 0; i < 5; i++) {
+            float k = 0.25f + i * 0.13f;
+            LensRenderer.small(from.lerp(to, k), 0.32f, 0.35f * intensity, (seed + i * 0.17f) % 1f);
+        }
+    }
+
+    /** Moves a lens centre toward the camera so it sits in front of the body it bends. */
+    private static Vec3 towardCamera(Vec3 p, Vec3 cam, double by) {
+        Vec3 d = cam.subtract(p);
+        double len = d.length();
+        return len < 1e-3 ? p : p.add(d.scale(Math.min(by, len * 0.5) / len));
     }
 
     /** The crown lights up and the orbital beam climbs from it toward the sky. */

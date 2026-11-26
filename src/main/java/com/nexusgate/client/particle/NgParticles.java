@@ -14,7 +14,7 @@ import org.jetbrains.annotations.Nullable;
  * pass targets, colours and lifetimes) using the sprite sets captured at registration.
  */
 public final class NgParticles {
-    @Nullable private static SpriteSet spark, mote, shard, ring, quantum;
+    @Nullable private static SpriteSet spark, mote, shard, ring;
 
     private NgParticles() {}
 
@@ -34,10 +34,6 @@ public final class NgParticles {
         event.registerSpriteSet(ModParticles.SHOCK_RING.get(), sprites -> {
             ring = sprites;
             return (type, level, x, y, z, vx, vy, vz) -> new ShockRingParticle(level, x, y, z, vx, vy, vz, sprites);
-        });
-        event.registerSpriteSet(ModParticles.QUANTUM.get(), sprites -> {
-            quantum = sprites;
-            return (type, level, x, y, z, vx, vy, vz) -> new QuantumParticle(level, x, y, z, vx, vy, vz, sprites);
         });
     }
 
@@ -73,15 +69,6 @@ public final class NgParticles {
     public static ShardParticle shard(double x, double y, double z, double vx, double vy, double vz) {
         ClientLevel level = level();
         return level == null || shard == null ? null : add(new ShardParticle(level, x, y, z, vx, vy, vz, shard));
-    }
-
-    /** A fluctuation that follows {@code points} in order (body → beam → core, or the reverse). */
-    @Nullable
-    public static QuantumParticle quantum(float speed, float jitter, Vec3... points) {
-        ClientLevel level = level();
-        if (level == null || quantum == null || points.length == 0) return null;
-        Vec3 p = points[0];
-        return add(new QuantumParticle(level, p.x, p.y, p.z, 0, 0, 0, quantum).follow(speed, jitter, points));
     }
 
     @Nullable

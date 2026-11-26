@@ -21,6 +21,8 @@ public final class ModShaders {
     @Nullable private static ShaderInstance wormhole;
     @Nullable private static ShaderInstance rift;
     @Nullable private static ShaderInstance dissolve;
+    @Nullable private static ShaderInstance lens;
+    @Nullable private static ShaderInstance fragment;
 
     private ModShaders() {}
 
@@ -30,6 +32,8 @@ public final class ModShaders {
         load(event, "wormhole", DefaultVertexFormat.POSITION_TEX_COLOR, s -> wormhole = s);
         load(event, "rift", DefaultVertexFormat.POSITION_TEX_COLOR, s -> rift = s);
         load(event, "matter_dissolve", DefaultVertexFormat.NEW_ENTITY, s -> dissolve = s);
+        load(event, "spacetime_lens", DefaultVertexFormat.POSITION_TEX_COLOR, s -> lens = s);
+        load(event, "quantum_fragment", DefaultVertexFormat.POSITION_TEX_COLOR, s -> fragment = s);
     }
 
     private static void load(RegisterShadersEvent event, String name, VertexFormat format, Consumer<ShaderInstance> sink) {
@@ -53,6 +57,15 @@ public final class ModShaders {
     public static ShaderInstance dissolve() {
         return dissolve != null ? dissolve : GameRenderer.getRendertypeEntityCutoutNoCullShader();
     }
+
+    /** Space-time lens program (only drawn when {@link #lensReady}). */
+    @Nullable
+    public static ShaderInstance lens() { return lens; }
+
+    public static boolean lensReady() { return lens != null; }
+
+    /** Quantum fluctuation fragments (additive). */
+    public static ShaderInstance fragment() { return orFallback(fragment); }
 
     /** The dissolve parameters live in the vertex colour, so only the real program may draw with them. */
     public static boolean dissolveReady() {

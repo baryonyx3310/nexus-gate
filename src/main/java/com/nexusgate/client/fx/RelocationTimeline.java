@@ -15,13 +15,15 @@ package com.nexusgate.client.fx;
 public final class RelocationTimeline {
     public static final float BEAM_START = 0.10f;
     public static final float CONNECT_END = 0.25f;
-    public static final float DISSOLVE_END = 0.80f;
+    /** The body is compressed to a point by here; then the point travels down the beam into the core. */
+    public static final float DISSOLVE_END = 0.86f;
+    public static final float TRAVEL_END = 0.97f;
     public static final float UPLINK_START = 0.78f;
 
     /** Ticks the orbital beam keeps flaring after the departure. */
     public static final int RELEASE_TICKS = 30;
     /** Length of the reception + reconstruction sequence at the destination. */
-    public static final int RECEPTION_TICKS = 50;
+    public static final int RECEPTION_TICKS = 60;
     /** Ticks to put a body back together after a cancelled charge. */
     public static final int REMATERIALIZE_TICKS = 10;
 
@@ -50,9 +52,35 @@ public final class RelocationTimeline {
         return ramp(BEAM_START, BEAM_START + 0.04f, t) * (1f - 0.85f * smooth(DISSOLVE_END, 1f, t));
     }
 
-    /** Body dematerialisation: 0 = intact, 1 = fully converted. */
+    /** Phase A: space around the body destabilises before any matter is converted (0..1, then held). */
+    public static float instability(float t) {
+        return smooth(0.08f, CONNECT_END, t);
+    }
+
+    /**
+     * Convergent space-time lens on the focal point: grows with the instability, then with the compression, and
+     * follows the point into the core, where it is gone.
+     */
+    public static float bodyLens(float t) {
+        return (0.3f * instability(t) + 0.7f * dissolve(t)) * (1f - smooth(0.93f, 1f, t));
+    }
+
+    /** Lens folded into the core while it absorbs the last of the matter and fires the uplink. */
+    public static float coreLens(float t) {
+        return 0.5f * smooth(0.74f, 0.9f, t);
+    }
+
+    /**
+     * Body compression (see {@link CollapseField}): 0 = intact, 1 = a single point. It starts gently with the
+     * phase-A instability and reaches the point at {@link #DISSOLVE_END}.
+     */
     public static float dissolve(float t) {
-        return ramp(CONNECT_END, DISSOLVE_END, t);
+        return smooth(0.08f, DISSOLVE_END, t);
+    }
+
+    /** Phase D: the point travels along the connection beam from the body into the core (0 → 1). */
+    public static float focalTravel(float t) {
+        return smooth(DISSOLVE_END, TRAVEL_END, t);
     }
 
     /** Orbital uplink (crown rings and sky beam) brightness during the charge. */
@@ -68,7 +96,12 @@ public final class RelocationTimeline {
         return k * k;
     }
 
-    /** Body opacity coming back after a cancel, starting from the dissolve it had. */
+    /** Core lens after DEPART: collapses with the release flare. */
+    public static float coreLensAfterDepart(float ticksSinceDepart) {
+        return 0.5f * release(ticksSinceDepart);
+    }
+
+    /** Compression coming back to 0 after a cancel, starting from the value it had. */
     public static float rematerialize(float startDissolve, float ticksSinceCancel) {
         return clamp01(startDissolve) * (1f - clamp01(ticksSinceCancel / REMATERIALIZE_TICKS));
     }
@@ -97,17 +130,64 @@ public final class RelocationTimeline {
 
     /** Reconstruction beam brightness. */
     public static float rebuildIntensity(float a) {
-        return ramp(15f, 17f, a) * (1f - smooth(44f, RECEPTION_TICKS, a));
+        return ramp(15f, 17f, a) * (1f - smooth(46f, 56f, a));
     }
 
-    /** Body dissolve while being rebuilt: hidden until the beam lands, then 1 → 0. */
+    /** The point coming out of the core along the beam to the arrival spot (1 = in the core, 0 = arrived). */
+    public static float arrivalTravel(float a) {
+        return 1f - smooth(12f, 22f, a);
+    }
+
+    /** Body compression while being rebuilt: a point until the matter has gathered, then it expands (1 → 0). */
     public static float reconstruct(float a) {
-        return 1f - ramp(20f, 48f, a);
+        return 1f - smooth(22f, 52f, a);
+    }
+
+    /** Silhouette instability while the rebuilt body settles. */
+    public static float arrivalInstability(float a) {
+        return 1f - smooth(48f, 58f, a);
+    }
+
+    /** Space distorts at the arrival spot before any matter appears, peaks while it is organised, then fades. */
+    public static float arrivalLens(float a) {
+        return smooth(8f, 16f, a) * (0.55f + 0.45f * reconstruct(a)) * (1f - smooth(42f, 58f, a));
+    }
+
+    /** Lens in the destination core while it is energised and emits. */
+    public static float receptionCoreLens(float a) {
+        return 0.5f * smooth(6f, 12f, a) * (1f - smooth(30f, 45f, a));
     }
 
     /** True while fluctuations should stream out of the destination core. */
     public static boolean emitting(float a) {
-        return a >= 15f && a < 46f;
+        return a >= 14f && a < 48f;
+    }
+
+    // ------------------------------------------------------------------ body encoding
+
+    /**
+     * What a body looks like right now: phase-A instability, compression toward the focal point, and how far the
+     * focal point has travelled along the beam (0 = on the body, 1 = in the core). All 0..1.
+     */
+    public record Body(float instability, float conversion, float travel) {
+        public static final Body NONE = new Body(0f, 0f, 0f);
+
+        /** True when the body must be drawn through the conversion shader. */
+        public boolean active() {
+            return instability > 0f || conversion > 0f;
+        }
+    }
+
+    /** Alpha values below this byte mean "instability only"; above it, conversion. */
+    public static final int CONVERSION_BASE = 38;
+
+    /**
+     * Packs the body state into the vertex alpha read by the matter dissolve shader:
+     * 0..37 = phase-A instability (body intact), 38..255 = conversion 0..1.
+     */
+    public static int encodeBody(float instability, float conversion) {
+        if (conversion > 0f) return CONVERSION_BASE + Math.round(clamp01(conversion) * (255 - CONVERSION_BASE));
+        return Math.round(clamp01(instability) * (CONVERSION_BASE - 1));
     }
 
     // ------------------------------------------------------------------ helpers

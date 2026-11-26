@@ -376,16 +376,6 @@ def p_shard():
     return g
 
 
-def p_quantum():
-    """8x8 square pixel of converted matter: solid 6x6 body, faint 1px rim."""
-    g = alpha_grid(8)
-    for y in range(8):
-        for x in range(8):
-            rim = x in (0, 7) or y in (0, 7)
-            set_a(g, x, y, 110 if rim else 255)
-    return g
-
-
 def p_ring():
     """32x32 octagonal ring with a fainter inner trace (pressure wave)."""
     n = 32
@@ -467,7 +457,6 @@ def main():
     write_png(os.path.join(particle, "spark.png"), p_spark())
     write_png(os.path.join(particle, "shard.png"), p_shard())
     write_png(os.path.join(particle, "shock_ring.png"), p_ring())
-    write_png(os.path.join(particle, "quantum.png"), p_quantum())
     print("textures written to", os.path.abspath(ROOT))
 
 

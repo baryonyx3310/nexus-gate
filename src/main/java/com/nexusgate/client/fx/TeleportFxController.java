@@ -142,7 +142,7 @@ public final class TeleportFxController {
     }
 
     public static boolean anyActive() {
-        return !CHARGES.isEmpty() || !BURSTS.isEmpty() || !RECEPTIONS.isEmpty();
+        return !CHARGES.isEmpty() || !BURSTS.isEmpty() || !RECEPTIONS.isEmpty() || QuantumFx.any();
     }
 
     @Nullable
@@ -175,20 +175,56 @@ public final class TeleportFxController {
     }
 
     /**
-     * How dematerialised a body is right now: 0 = intact, 1 = fully converted. Used only to draw the body
-     * (see {@code MatterDissolveRenderer}); the entity itself is never touched.
+     * How a body looks right now: phase-A instability, compression toward the focal point and how far that point
+     * has travelled along the beam. Used only to draw the body (see {@code MatterDissolveRenderer}); the entity
+     * itself is never touched.
      */
-    public static float dissolve(int entityId, float partial) {
+    public static RelocationTimeline.Body body(int entityId, float partial) {
         Charge c = CHARGES.get(entityId);
-        if (c != null) return RelocationTimeline.dissolve(c.progress(partial));
-        for (Reception r : RECEPTIONS) {
-            if (r.entityId == entityId) return RelocationTimeline.reconstruct(r.age(partial));
+        if (c != null) {
+            float t = c.progress(partial);
+            return new RelocationTimeline.Body(RelocationTimeline.instability(t), RelocationTimeline.dissolve(t),
+                    RelocationTimeline.focalTravel(t));
+        }
+        Reception r = receptionOf(entityId);
+        if (r != null) {
+            float a = r.age(partial);
+            return new RelocationTimeline.Body(RelocationTimeline.arrivalInstability(a), RelocationTimeline.reconstruct(a),
+                    RelocationTimeline.arrivalTravel(a));
         }
         Long departed = IN_TRANSIT.get(entityId);
-        if (departed != null && ticks - departed < IN_TRANSIT_TICKS) return 1f;
+        if (departed != null && ticks - departed < IN_TRANSIT_TICKS) return new RelocationTimeline.Body(1f, 1f, 1f);
         Rematerialize m = REMATERIALIZING.get(entityId);
-        if (m != null) return RelocationTimeline.rematerialize(m.from, ticks - m.startTick + partial);
-        return 0f;
+        if (m != null) {
+            float k = ticks - m.startTick + partial;
+            float conv = RelocationTimeline.rematerialize(m.from, k);
+            return new RelocationTimeline.Body(1f - Mth.clamp(k / RelocationTimeline.REMATERIALIZE_TICKS, 0f, 1f), conv, 0f);
+        }
+        return RelocationTimeline.Body.NONE;
+    }
+
+    /**
+     * The focal point the body collapses into: where the connection beam meets the body (chest height), moving
+     * along the beam into the core in phase D (and out of it, at the destination).
+     */
+    public static Vec3 focal(int entityId, float partial) {
+        Charge c = CHARGES.get(entityId);
+        if (c != null) {
+            Vec3 chest = c.position(partial).add(0, 1.0, 0);
+            return chest.lerp(core(c.station), RelocationTimeline.focalTravel(c.progress(partial)));
+        }
+        Reception r = receptionOf(entityId);
+        if (r != null) {
+            Vec3 chest = r.body(partial).add(0, 1.0, 0);
+            return chest.lerp(core(r.station), RelocationTimeline.arrivalTravel(r.age(partial)));
+        }
+        return entityPosition(entityId, Vec3.ZERO, partial).add(0, 1.0, 0);
+    }
+
+    @Nullable
+    private static Reception receptionOf(int entityId) {
+        for (Reception r : RECEPTIONS) if (r.entityId == entityId) return r;
+        return null;
     }
 
     private static boolean isLocal(int entityId) {
@@ -211,6 +247,7 @@ public final class TeleportFxController {
                 CHARGES.put(p.entityId(), c);
                 REMATERIALIZING.remove(p.entityId());
                 IN_TRANSIT.remove(p.entityId());
+                com.nexusgate.client.render.MatterDissolveRenderer.forget(p.entityId());
                 RECEPTIONS.removeIf(r -> r.entityId == p.entityId());
                 if (local) {
                     DiveFx.reset();
@@ -221,6 +258,7 @@ public final class TeleportFxController {
                 Charge c = CHARGES.remove(p.entityId());
                 BURSTS.add(new Burst(BurstKind.CANCEL, c != null ? c.position(0) : p.pos(), p.station(), ticks));
                 float was = c != null ? RelocationTimeline.dissolve(c.progress(0)) : 0f;
+                com.nexusgate.client.render.MatterDissolveRenderer.forget(p.entityId());
                 if (was > 0f) REMATERIALIZING.put(p.entityId(), new Rematerialize(was, ticks));
                 cancelSparks(p.pos());
                 if (local) {
@@ -236,6 +274,7 @@ public final class TeleportFxController {
             case GateFxPayload.PHASE_DEPART -> {
                 CHARGES.remove(p.entityId());
                 IN_TRANSIT.put(p.entityId(), ticks);
+                com.nexusgate.client.render.MatterDissolveRenderer.forget(p.entityId());
                 BURSTS.add(new Burst(BurstKind.DEPART, p.pos(), p.station(), ticks));
                 uplinkRelease(p.station());
                 if (local) {
@@ -260,6 +299,7 @@ public final class TeleportFxController {
             CHARGES.clear();
             BURSTS.clear();
             RECEPTIONS.clear();
+            QuantumFx.clear();
             REMATERIALIZING.clear();
             IN_TRANSIT.clear();
             return;
@@ -267,7 +307,7 @@ public final class TeleportFxController {
         if (mc.isPaused()) return;
         ticks++;
         BURSTS.removeIf(b -> ticks - b.startTick > Burst.LENGTH);
-        RECEPTIONS.removeIf(r -> ticks - r.startTick > RelocationTimeline.RECEPTION_TICKS + 5);
+        RECEPTIONS.removeIf(r -> ticks - r.startTick > RelocationTimeline.RECEPTION_TICKS);
         REMATERIALIZING.values().removeIf(m -> ticks - m.startTick > RelocationTimeline.REMATERIALIZE_TICKS);
         IN_TRANSIT.values().removeIf(t -> ticks - t > IN_TRANSIT_TICKS);
         Iterator<Charge> it = CHARGES.values().iterator();
@@ -280,6 +320,7 @@ public final class TeleportFxController {
             chargingParticles(c);
         }
         for (Reception r : RECEPTIONS) receptionParticles(r);
+        QuantumFx.tick();
     }
 
     // ---------------------------------------------------------------- geometry
@@ -294,13 +335,18 @@ public final class TeleportFxController {
         return new Vec3(station.getX() + 0.5, station.getY() + 2.05, station.getZ() + 0.5);
     }
 
-    /** Point of the segment a..b closest to p. */
-    private static Vec3 closestOnSegment(Vec3 a, Vec3 b, Vec3 p) {
-        Vec3 ab = b.subtract(a);
-        double len2 = ab.lengthSqr();
-        if (len2 < 1e-6) return a;
-        double t = Mth.clamp(p.subtract(a).dot(ab) / len2, 0.0, 1.0);
-        return a.add(ab.scale(t));
+    /**
+     * A point of the body as it is drawn right now: a vertex of the deformed geometry when the renderer has
+     * sampled one, else a point of the body shape collapsed by the same field.
+     */
+    private static Vec3 fromBody(int entityId, Vec3 feet, Vec3 focal, float compression) {
+        var samples = com.nexusgate.client.render.MatterDissolveRenderer.samples(entityId);
+        if (!samples.isEmpty()) return samples.get(RANDOM.nextInt(samples.size()));
+        Vec3 p = bodyPoint(feet, RANDOM.nextFloat());
+        float[] out = new float[3];
+        CollapseField.collapse((float) p.x, (float) p.y, (float) p.z, (float) focal.x, (float) focal.y, (float) focal.z,
+                compression, 2.5f, out);
+        return new Vec3(out[0], out[1], out[2]);
     }
 
     /** A random point on the body surface around {@code feet}, at the given fraction of its height. */
@@ -318,54 +364,54 @@ public final class TeleportFxController {
         Vec3 chest = at.add(0, 1.0, 0);
         Vec3 core = core(c.station);
 
-        // 1. The core accumulates energy: motes drawn into it.
-        if (t < RelocationTimeline.DISSOLVE_END && RANDOM.nextFloat() < 0.5f + t) {
+        // The core accumulates energy: fluctuations condense into it from the space around it.
+        if (t < RelocationTimeline.DISSOLVE_END && RANDOM.nextFloat() < 0.4f + t) {
             double a = RANDOM.nextDouble() * Math.PI * 2;
-            Vec3 from = core.add(Math.cos(a) * 0.7, (RANDOM.nextDouble() - 0.5) * 0.8, Math.sin(a) * 0.7);
-            var m = NgParticles.moteTo(from, core, 0.02f, 0.02f);
-            if (m != null) m.life(20);
+            Vec3 from = core.add(Math.cos(a) * 0.8, (RANDOM.nextDouble() - 0.5) * 0.9, Math.sin(a) * 0.8);
+            QuantumFx.stream(from, core, 0.06f, 0.03f);
         }
 
-        // 2. Connection: energy pulses run along the beam as it reaches the traveller.
+        // Phase A: the space around the body starts producing fluctuations that pop in and out.
+        float inst = RelocationTimeline.instability(t);
+        if (inst > 0f && t < RelocationTimeline.DISSOLVE_END && RANDOM.nextFloat() < inst * 0.8f) {
+            QuantumFx.flicker(chest, 0.7);
+        }
+
+        // Connection: energy runs down the beam as it reaches the traveller.
         float reach = RelocationTimeline.beamReach(t);
-        if (reach > 0f && RelocationTimeline.beamIntensity(t) > 0.2f && RANDOM.nextFloat() < 0.35f) {
-            Vec3 tip = core.lerp(chest, reach);
-            var q = NgParticles.quantum(0.16f, 0f, core, tip);
-            if (q != null) q.colors(0xFFFFFF, CYAN);
+        if (reach > 0f && RelocationTimeline.beamIntensity(t) > 0.2f && RANDOM.nextFloat() < 0.3f) {
+            QuantumFx.stream(core, core.lerp(chest, reach), 0.3f, 0.03f);
         }
 
-        // 3. Dematerialisation: pixels leave the body at the dissolve front, join the beam, flow into the core.
+        // Matter breaks away from the regions being compressed (sampled from the deformed geometry itself),
+        // is drawn into the focal point and carried down the beam into the core.
         float d = RelocationTimeline.dissolve(t);
-        if (d > 0f && d < 1f) {
-            int count = 2 + RANDOM.nextInt(3);
+        Vec3 focal = focal(c.entityId, 0);
+        if (d > 0.05f && d < 1f) {
+            int count = 1 + Math.round(d * 4f) + RANDOM.nextInt(2);
             for (int i = 0; i < count; i++) {
-                float front = d * 1.09f - 0.09f;
-                float h = 1f - (front - 0.4f * RANDOM.nextFloat()) / 0.6f;
-                Vec3 from = bodyPoint(at, h);
-                Vec3 onBeam = closestOnSegment(core, chest, from);
-                NgParticles.quantum(0.14f + RANDOM.nextFloat() * 0.1f, 0.03f, from, onBeam, core);
+                QuantumFx.absorb(fromBody(c.entityId, at, focal, d), focal, core);
             }
-        } else if (d >= 1f && t < 0.9f && RANDOM.nextFloat() < 0.5f) {
-            // The last fluctuations are absorbed.
-            NgParticles.quantum(0.2f, 0.02f, chest.add((RANDOM.nextDouble() - 0.5) * 0.3, 0, (RANDOM.nextDouble() - 0.5) * 0.3), core);
+        }
+        // Phase D: the point rides the beam into the core, shedding the last fluctuations.
+        float travel = RelocationTimeline.focalTravel(t);
+        if (travel > 0f && travel < 1f) {
+            for (int i = 0; i < 2; i++) QuantumFx.stream(focal, core, 0.25f + RANDOM.nextFloat() * 0.15f, 0.04f);
         }
 
-        // 4. Uplink: packets of converted matter climb the orbital beam.
+        // Uplink: converted matter climbs the orbital beam.
         float up = RelocationTimeline.uplink(t);
         if (up > 0f && RANDOM.nextFloat() < up) {
             Vec3 crown = crown(c.station);
-            NgParticles.quantum(0.6f + RANDOM.nextFloat() * 0.4f, 0.04f, core, crown, crown.add(0, 24, 0));
+            QuantumFx.stream(crown, crown.add(0, 16 + RANDOM.nextInt(10), 0), 0.9f + RANDOM.nextFloat() * 0.5f, 0.06f);
         }
     }
 
-    /** Departure: a last burst of packets shoots up the orbital beam. */
+    /** Departure: a last burst of matter shoots up the orbital beam. */
     private static void uplinkRelease(BlockPos station) {
-        Vec3 core = core(station);
         Vec3 crown = crown(station);
-        for (int i = 0; i < 40; i++) {
-            float speed = 0.8f + RANDOM.nextFloat() * 0.8f;
-            var q = NgParticles.quantum(speed, 0.05f, core, crown, crown.add(0, 20 + RANDOM.nextInt(20), 0));
-            if (q != null) q.colors(0xFFFFFF, 0xCFFBFF);
+        for (int i = 0; i < 36; i++) {
+            QuantumFx.stream(crown, crown.add(0, 18 + RANDOM.nextInt(22), 0), 1.0f + RANDOM.nextFloat() * 0.9f, 0.07f);
         }
         NgParticles.ring(crown.x, crown.y, crown.z, 1.4f);
     }
@@ -374,29 +420,29 @@ public final class TeleportFxController {
         float a = r.age(0);
         Vec3 core = core(r.station);
         Vec3 crown = crown(r.station);
+        Vec3 feet = r.body(0);
+        Vec3 chest = feet.add(0, 1.0, 0);
 
-        // 1. The transmission comes down the sky beam into the crown.
+        // The transmission comes down the sky beam into the crown and the core.
         if (a < 12f) {
             for (int i = 0; i < 3; i++) {
-                NgParticles.quantum(0.9f + RANDOM.nextFloat() * 0.5f, 0.04f, crown.add(0, 12 + RANDOM.nextInt(12), 0), crown, core);
+                QuantumFx.stream(crown.add(0, 12 + RANDOM.nextInt(12), 0), core, 1.0f + RANDOM.nextFloat() * 0.5f, 0.06f);
             }
         }
-        // 2. The core is energised.
-        if (a >= 8f && a < 20f && RANDOM.nextFloat() < 0.7f) {
-            double ang = RANDOM.nextDouble() * Math.PI * 2;
-            var m = NgParticles.moteTo(core.add(Math.cos(ang) * 0.7, (RANDOM.nextDouble() - 0.5) * 0.8, Math.sin(ang) * 0.7), core, 0.02f, 0.02f);
-            if (m != null) m.life(20);
+        Vec3 focal = focal(r.entityId, 0);
+        // The space at the arrival spot destabilises before any matter appears.
+        if (a >= 8f && a < 46f && RANDOM.nextFloat() < 0.6f) QuantumFx.flicker(chest, 0.5);
+        // The point comes out of the core along the beam...
+        float travel = RelocationTimeline.arrivalTravel(a);
+        if (travel > 0f && travel < 1f) {
+            for (int i = 0; i < 2; i++) QuantumFx.stream(core, focal, 0.25f + RANDOM.nextFloat() * 0.15f, 0.04f);
         }
-        // 3. Fluctuations leave the core, ride the beam and rebuild the body bottom-up.
+        // ...then matter keeps arriving through it and gathers where the body is expanding.
         if (RelocationTimeline.emitting(a)) {
-            Vec3 feet = r.body(0);
-            Vec3 chest = feet.add(0, 1.0, 0);
-            float built = 1f - RelocationTimeline.reconstruct(a);
-            int count = 2 + RANDOM.nextInt(3);
+            float c = RelocationTimeline.reconstruct(a);
+            int count = 1 + Math.round((1f - c) * 3f) + RANDOM.nextInt(2);
             for (int i = 0; i < count; i++) {
-                Vec3 to = bodyPoint(feet, Math.min(1f, built + 0.15f) * RANDOM.nextFloat());
-                Vec3 onBeam = closestOnSegment(core, chest, to);
-                NgParticles.quantum(0.14f + RANDOM.nextFloat() * 0.1f, 0.03f, core, onBeam, to);
+                QuantumFx.emerge(core, focal, fromBody(r.entityId, feet, focal, c));
             }
         }
     }

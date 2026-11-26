@@ -65,14 +65,16 @@ As texturas e os JSONs são gerados por `python tools/gen_textures.py` e `python
 - **Terminal radial**: a tela mostra a face do tambor. Escolha uma câmara (o tambor gira para a posição de disparo) e clique no núcleo para ativar. Durante a carga, a íris abre e, no último segundo, o núcleo se abre e a visão mergulha num túnel até sair do outro lado. A roda do mouse ou as setas trocam de cilindro quando há mais de 8 destinos. Enter ativa.
 - **Aviso de conexão**: no primeiro quarto da carga, a tela do tambor mostra "CONECTANDO COM A **INTRA**", em letras pretas com contorno vermelho. A palavra INTRA aparece maior e pulsando.
 - **Sequência de realocação no mundo**: é o que os outros jogadores veem, e você também, em terceira pessoa ou com a tela fechada.
-  1. O núcleo acumula energia e um feixe sai dele até o jogador.
-  2. O corpo se desfaz pixel por pixel, de cima para baixo. As flutuações quânticas entram no feixe e são absorvidas pelo núcleo.
-  3. A coroa acende e um feixe orbital sobe ao céu. Na partida, ele dá um clarão.
-  4. No destino, um feixe desce do céu até a coroa e o núcleo é ativado. Depois, as flutuações saem do núcleo pelo feixe e reconstroem o corpo de baixo para cima.
+  1. **Instabilidade:** o núcleo acumula energia e um feixe sai dele até o peito do jogador, que vira o ponto focal. O espaço em volta começa a convergir para esse ponto: o fundo é puxado para dentro, num funil que gira, com ondulações correndo para o centro e separação de cores.
+  2. **Colapso:** a própria geometria do corpo é comprimida. Primeiro perde largura (mãos, cabeça e pés na frente), depois afunila e é puxada para a altura do ponto focal, até virar um ponto minúsculo. O corpo é desenhado o tempo todo e nunca some de uma vez; a matéria comprimida vira energia e a sombra encolhe junto.
+  3. **Flutuações quânticas:** fragmentos geométricos que mudam de forma, aparecem em posições fantasma, se dividem e se recombinam. Eles se desprendem dos vértices do corpo que está sendo comprimido, são atraídos para o ponto focal e descem pelo feixe até o núcleo. No fim, o próprio ponto desliza pelo feixe e é absorvido pelo núcleo.
+  4. **Transmissão:** a coroa acende e um feixe orbital sobe ao céu. Na partida, ele dá um clarão.
+  5. **Recepção:** no destino, um feixe desce do céu, o núcleo ativa e o espaço do ponto de chegada se distorce antes de qualquer matéria aparecer. O ponto sai do núcleo pelo feixe até o local de chegada, as flutuações se agrupam nele e o corpo se expande a partir do ponto até recuperar cabeça, tronco, braços e pernas. A distorção diminui conforme a matéria é reconstruída.
 
   Tudo isso é só visual e segue os mesmos eventos de sempre do servidor. O jogador continua no lugar até o teleporte de verdade.
-- **VFX próprios**: shaders GLSL em `assets/nexusgate/shaders/core` (núcleo, campo de energia, túnel, fenda e dissolução de matéria) e partículas próprias (faíscas, motes, estilhaços, anel de choque e flutuações quânticas).
+- **VFX próprios**: shaders GLSL em `assets/nexusgate/shaders/core` (núcleo, campo de energia, túnel, fenda, conversão de matéria, lente espaço-temporal e flutuações quânticas) e partículas próprias (faíscas, motes, estilhaços e anel de choque).
 - Com shaderpacks (Iris/Oculus), os shaders próprios podem ficar com aparência diferente.
+- A distorção do espaço (refração real da imagem) é desligada sozinha com gráfico "Fabuloso" ou com um shaderpack ativo. O resto da animação continua.
 
 ## Checklist de teste no jogo
 

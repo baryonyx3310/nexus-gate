@@ -3,6 +3,7 @@ package com.nexusgate.client.gui;
 import com.nexusgate.client.RenameScreen;
 import com.nexusgate.client.fx.DiveFx;
 import com.nexusgate.client.fx.GateSounds;
+import com.nexusgate.client.fx.RelocationTimeline;
 import com.nexusgate.client.fx.TeleportFxController;
 import com.nexusgate.client.render.ModShaders;
 import com.nexusgate.client.render.ShaderQuads;
@@ -16,6 +17,7 @@ import com.nexusgate.net.SetPublicPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
@@ -447,6 +449,38 @@ public class GateScreen extends Screen implements TeleportFxController.LocalList
             if (f > 0) g.fill(0, 0, width, height, GuiDraw.argb(0.22f * GuiDraw.levels(f, 3), 0xFF2030));
         }
         GuiDraw.setUnit(1f);
+        if (charge != null) connectingBanner(g, progress);
+    }
+
+    /**
+     * "CONECTANDO COM A INTRA" while the core reaches out to the traveller (connection phase only):
+     * black letters with a red outline, INTRA larger with a pulsing bright outline and a red glow behind it.
+     */
+    private void connectingBanner(GuiGraphics g, float progress) {
+        float a = RelocationTimeline.bannerAlpha(progress);
+        if (a <= 0.02f) return;
+        String lead = Component.translatable("screen.nexusgate.connecting").getString() + " ";
+        String hot = Component.translatable("screen.nexusgate.connecting_highlight").getString();
+        float big = 1.5f;
+        float wLead = font.width(lead);
+        float wHot = font.width(hot) * big;
+        float x = Math.round(cx - (wLead + wHot) / 2f);
+        float y = Math.round(cy - R * 1.24f - 24);
+        float pulse = 0.5f + 0.5f * Mth.sin(time * 6f);
+        GuiDraw.blockGlow(g, x + wLead + wHot / 2f, y + 6f, wHot * 0.75f, 0xFF3030, 0.3f * a * (0.6f + 0.4f * pulse));
+        outlined(g, lead, x, y + 3, 1f, GuiDraw.fade(0xFF000000, a), GuiDraw.fade(0xFFB01E1E, a));
+        int hotOutline = GuiDraw.lerpColor(0xFFB01E1E, 0xFFFF3030, pulse);
+        outlined(g, hot, x + wLead, y, big, GuiDraw.fade(0xFF000000, a), GuiDraw.fade(hotOutline, a));
+    }
+
+    private void outlined(GuiGraphics g, String s, float x, float y, float scale, int fill, int outline) {
+        g.pose().pushPose();
+        g.pose().translate(x, y, 0);
+        g.pose().scale(scale, scale, 1f);
+        font.drawInBatch8xOutline(Component.literal(s).getVisualOrderText(), 0, 0, fill, outline,
+                g.pose().last().pose(), g.bufferSource(), LightTexture.FULL_BRIGHT);
+        g.flush();
+        g.pose().popPose();
     }
 
     /** Size of one art pixel in GUI pixels. */
@@ -758,7 +792,7 @@ public class GateScreen extends Screen implements TeleportFxController.LocalList
     }
 
     private void header(GuiGraphics g, float alpha) {
-        String brand = "NEXUS GATE";
+        String brand = "RMIR";
         textShadow(g, brand, 10, 9, 0xFF000000 | CYAN, alpha);
         String src = " // " + payload.sourceName().toUpperCase(Locale.ROOT);
         text(g, src, 10 + font.width(brand), 9, TEXT, alpha);
@@ -770,7 +804,7 @@ public class GateScreen extends Screen implements TeleportFxController.LocalList
             float k = 1f - GuiDraw.levels(i / 25f, 4);
             GuiDraw.rect(g, x0, 20, x1, 22, GuiDraw.argb(0.7f * alpha * k, CYAN), GuiDraw.argb(0.7f * alpha * k, CYAN));
         }
-        text(g, "SYS.TRANSLOC  v1.0  //  " + String.format(Locale.ROOT, "%02d", entries.size()) + " NODES", 10, 25, TEXT_DIM, alpha * 0.8f);
+        text(g, "DTIR.INTRA  v1.0  //  " + String.format(Locale.ROOT, "%02d", entries.size()) + " NODES", 10, 25, TEXT_DIM, alpha * 0.8f);
         if (combatTicks > 0 && ((int) (time * 3f)) % 2 == 0) {
             String warn = Component.translatable("screen.nexusgate.interference", (combatTicks + 19) / 20).getString();
             text(g, warn, (int) (cx - font.width(warn) / 2f), (int) (cy - R * 1.24f - 12), 0xFF000000 | RED, alpha);

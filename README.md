@@ -1,10 +1,16 @@
-# Nexus Gate
+# Realocador Material Intra-Rede (RMIR)
 
 Mod de teleporte com estética tecnológica para **Minecraft 1.21.1 / NeoForge**. Viajar entre bases é cômodo. Usar o teleporte para fugir de uma luta não funciona.
 
+## Lore
+
+O maior avanço dessa civilização foi a **Matéria Suspensa**: matéria condensada por processos quânticos e guardada em regiões espalhadas pelo espaço e pela órbita da Terra. O **Drive Terminal Intra-Rede (DTIR)** é a infraestrutura que transforma informação e comandos em alterações físicas nessa matéria e a distribui pela rede orbital.
+
+O Realocador é o equipamento que liga o usuário ao DTIR. Ele não leva ninguém de um ponto a outro: converte o indivíduo em flutuações quânticas, transmite essas flutuações pela rede orbital e reconstrói o corpo no destino com Matéria Suspensa.
+
 ## Conteúdo
 
-- **Estação de Teleporte**: máquina de 2 blocos de altura com carcaça industrial (grafite e cerâmica). Na frente fica um tambor de revólver animado, com 8 câmaras, íris mecânica e núcleo de plasma.
+- **Realocador Material Intra-Rede** (o bloco que antes se chamava Estação de Teleporte): máquina de 2 blocos de altura com carcaça industrial (grafite e cerâmica). Na frente fica um tambor de revólver animado, com 8 câmaras, íris mecânica e núcleo de plasma.
   - Ao colocar, você escolhe o nome dela.
   - Clique direito numa estação nova sincroniza (ativa) ela para você.
   - Clique direito numa estação sincronizada abre o terminal de seleção.
@@ -57,7 +63,15 @@ As texturas e os JSONs são gerados por `python tools/gen_textures.py` e `python
 ## Visual
 
 - **Terminal radial**: a tela mostra a face do tambor. Escolha uma câmara (o tambor gira para a posição de disparo) e clique no núcleo para ativar. Durante a carga, a íris abre e, no último segundo, o núcleo se abre e a visão mergulha num túnel até sair do outro lado. A roda do mouse ou as setas trocam de cilindro quando há mais de 8 destinos. Enter ativa.
-- **VFX próprios**: shaders GLSL em `assets/nexusgate/shaders/core` (núcleo, campo de energia, túnel e fenda) e partículas próprias (faíscas, motes, estilhaços e anel de choque).
+- **Aviso de conexão**: no primeiro quarto da carga, a tela do tambor mostra "CONECTANDO COM A **INTRA**", em letras pretas com contorno vermelho. A palavra INTRA aparece maior e pulsando.
+- **Sequência de realocação no mundo**: é o que os outros jogadores veem, e você também, em terceira pessoa ou com a tela fechada.
+  1. O núcleo acumula energia e um feixe sai dele até o jogador.
+  2. O corpo se desfaz pixel por pixel, de cima para baixo. As flutuações quânticas entram no feixe e são absorvidas pelo núcleo.
+  3. A coroa acende e um feixe orbital sobe ao céu. Na partida, ele dá um clarão.
+  4. No destino, um feixe desce do céu até a coroa e o núcleo é ativado. Depois, as flutuações saem do núcleo pelo feixe e reconstroem o corpo de baixo para cima.
+
+  Tudo isso é só visual e segue os mesmos eventos de sempre do servidor. O jogador continua no lugar até o teleporte de verdade.
+- **VFX próprios**: shaders GLSL em `assets/nexusgate/shaders/core` (núcleo, campo de energia, túnel, fenda e dissolução de matéria) e partículas próprias (faíscas, motes, estilhaços, anel de choque e flutuações quânticas).
 - Com shaderpacks (Iris/Oculus), os shaders próprios podem ficar com aparência diferente.
 
 ## Checklist de teste no jogo

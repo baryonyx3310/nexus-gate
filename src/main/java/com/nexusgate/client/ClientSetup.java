@@ -31,6 +31,7 @@ public final class ClientSetup {
         modBus.addListener(ClientSetup::guiLayers);
         modBus.addListener(ClientSetup::extensions);
         NeoForge.EVENT_BUS.addListener(WorldFxRenderer::onRenderLevel);
+        NeoForge.EVENT_BUS.addListener(com.nexusgate.client.render.MatterDissolveRenderer::onRenderPlayer);
         NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post e) -> TeleportFxController.tick());
     }
 

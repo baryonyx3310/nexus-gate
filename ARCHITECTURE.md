@@ -1,7 +1,8 @@
-# Nexus Gate — Arquitetura
+# Realocador Material Intra-Rede (RMIR) — Arquitetura
 
 Mapa técnico do código. Para o que o mod faz do ponto de vista do jogador, veja o [README](README.md). Para o porquê das decisões, veja o [design](docs/superpowers/specs/2026-11-21-nexus-gate-design.md).
 
+- **Nome:** o jogador vê "Realocador Material Intra-Rede (RMIR)". Os ids internos continuam `nexusgate`, `teleport_station` e o pacote `com.nexusgate`, para não quebrar mundos salvos.
 - **Plataforma:** Minecraft 1.21.1, NeoForge, Java 21.
 - **Mod id:** `nexusgate`. Pacote raiz: `com.nexusgate`.
 - **Princípio central:** o servidor decide tudo. O cliente só desenha. Toda regra (distância, combate, XP, permissão) é checada de novo no servidor, mesmo que a tela já a mostre.
@@ -23,7 +24,7 @@ Mapa técnico do código. Para o que o mod faz do ponto de vista do jogador, vej
 | `client/gui` | cliente | O terminal radial (tambor de revólver) e o desenho vetorial dele. |
 | `client/fx` | cliente | O cérebro dos efeitos visuais, o mergulho no núcleo, o HUD, os efeitos no mundo e os sons de interface. |
 | `client/render` | cliente | Renderer animado da estação (tambor, íris, núcleo), shaders próprios e render types. |
-| `client/particle` | cliente | Partículas próprias: faísca, mote, estilhaço, anel de choque. |
+| `client/particle` | cliente | Partículas próprias: faísca, mote, estilhaço, anel de choque e flutuação quântica (`QuantumParticle`, que segue um caminho corpo → feixe → núcleo ou o inverso). |
 
 O código cliente só é carregado no cliente. `NexusGate` chama `ClientSetup.init` apenas quando `FMLEnvironment.dist.isClient()`. Os handlers de payload que vão para o cliente são lambdas que chamam `ClientPayloadHandlers`, então o servidor dedicado nunca carrega essas classes.
 
@@ -87,10 +88,19 @@ ServerTickEvent → ChargeManager.onServerTick (cada sessão)
 
 ## Cliente e visual
 
-Tudo de visual parte de **`TeleportFxController`**. Ele recebe os `GateFxPayload`, acompanha as cargas visíveis, solta partículas e expõe o progresso para quatro consumidores:
+Tudo de visual parte de **`TeleportFxController`**. Ele recebe os `GateFxPayload`, acompanha as cargas e as recepções visíveis, solta as partículas e expõe o progresso para cinco consumidores. O tempo de cada etapa vem de **`RelocationTimeline`**, que só tem funções puras e tem teste.
+
+A sequência de realocação usa só os eventos que o servidor já mandava:
+- `START` traz a duração da carga, e cada etapa é uma fração dela: conexão (0–25%), desmaterialização (25–80%) e uplink orbital (80–100%);
+- `DEPART` marca o teleporte de verdade e o clarão do feixe orbital;
+- `ARRIVE` começa a recepção: feixe do céu, núcleo, reconstrução (50 ticks).
+
+O servidor não sabe que essa animação existe.
+
 
 - **`StationRenderer`** (block entity renderer) é a máquina em voxels. Tem o tambor de 8 câmaras dentro do anel do estator, a íris de 8 lâminas, o núcleo de plasma, a sirene da antena e o nome na coroa. Parado, o tambor avança 45° a cada poucos segundos. Carregando, dá duas voltas, acende as lentes em cascata e abre a íris em passos. A geometria vem de `DrumMesh`, com círculos "escadinha" no grid de pixels do modelo. `StationItemRenderer` reaproveita o mesmo desenho para o item.
-- **`WorldFxRenderer`** desenha no mundo: anéis holográficos em volta do viajante, o feixe saindo do núcleo, a coluna de luz e as explosões de fenda.
+- **`WorldFxRenderer`** desenha no mundo: o feixe de conexão do núcleo até o jogador, a coroa acesa e o feixe orbital, o feixe que desce do céu no destino, o feixe de reconstrução e as fendas nos núcleos.
+- **`MatterDissolveRenderer`** faz a desmaterialização do corpo. No `RenderPlayerEvent.Pre`, cancela o render normal e chama o mesmo renderer de novo por um buffer embrulhado. Cada camada com textura (skin, armadura, capa, itens) vai para o shader `matter_dissolve`, com a altura do vértice e a dissolução na cor do vértice. A textura de cada `RenderType` é lida pelo `META-INF/accesstransformer.cfg`. A entidade não muda em nada.
 - **`HudFxLayer`** desenha o medidor radial de carga em volta da mira e a sequência de tela cheia (mergulho → túnel → saída).
 - **`GateScreen`** é o terminal radial. Ele implementa `TeleportFxController.LocalListener` para seguir a carga do próprio jogador.
 
@@ -112,6 +122,7 @@ Classes de apoio:
 | `energy_field` | Fitas, anéis e colunas de energia (aditivo). |
 | `wormhole` | O túnel do mergulho. |
 | `rift` | A fenda espacial que escurece o centro. |
+| `matter_dissolve` | Formato de entidade. Dissolve o corpo pixel por pixel, de cima para baixo, com borda ciano. Sem ele, o corpo só some na metade da conversão. |
 
 - **`ModShaders`** registra os programas. Se o driver recusar um deles, cada getter cai no shader vanilla `position_tex_color`, e o jogo não trava.
 - **`ModRenderTypes`** define os render types do mundo. Todos testam profundidade mas não escrevem nela. Os parâmetros de cada instância vão na cor do vértice.
@@ -143,7 +154,8 @@ Classes de apoio:
 
 - `core`: `ChargeRules`, `ChargeSession`, `CombatLock`, `CombatRules`, `RequestValidator`, `XpCost`, `SafeArrival`, `StationSorter`, `LocatorArrow` e `Permissions`;
 - `StationRecord`;
-- `RadialLayout` e `GlyphFactory`.
+- `RadialLayout` e `GlyphFactory`;
+- `RelocationTimeline`.
 
 Renderização, rede e eventos não têm teste automático. Use o checklist do README no jogo (`./gradlew runClient`).
 

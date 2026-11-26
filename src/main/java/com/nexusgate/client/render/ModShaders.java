@@ -1,6 +1,7 @@
 package com.nexusgate.client.render;
 
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import com.nexusgate.NexusGate;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.ShaderInstance;
@@ -19,20 +20,22 @@ public final class ModShaders {
     @Nullable private static ShaderInstance field;
     @Nullable private static ShaderInstance wormhole;
     @Nullable private static ShaderInstance rift;
+    @Nullable private static ShaderInstance dissolve;
 
     private ModShaders() {}
 
     public static void register(RegisterShadersEvent event) {
-        load(event, "core_orb", s -> orb = s);
-        load(event, "energy_field", s -> field = s);
-        load(event, "wormhole", s -> wormhole = s);
-        load(event, "rift", s -> rift = s);
+        load(event, "core_orb", DefaultVertexFormat.POSITION_TEX_COLOR, s -> orb = s);
+        load(event, "energy_field", DefaultVertexFormat.POSITION_TEX_COLOR, s -> field = s);
+        load(event, "wormhole", DefaultVertexFormat.POSITION_TEX_COLOR, s -> wormhole = s);
+        load(event, "rift", DefaultVertexFormat.POSITION_TEX_COLOR, s -> rift = s);
+        load(event, "matter_dissolve", DefaultVertexFormat.NEW_ENTITY, s -> dissolve = s);
     }
 
-    private static void load(RegisterShadersEvent event, String name, Consumer<ShaderInstance> sink) {
+    private static void load(RegisterShadersEvent event, String name, VertexFormat format, Consumer<ShaderInstance> sink) {
         try {
             event.registerShader(new ShaderInstance(event.getResourceProvider(),
-                    ResourceLocation.fromNamespaceAndPath(NexusGate.MOD_ID, name), DefaultVertexFormat.POSITION_TEX_COLOR), sink);
+                    ResourceLocation.fromNamespaceAndPath(NexusGate.MOD_ID, name), format), sink);
         } catch (Exception e) {
             NexusGate.LOGGER.error("Nexus Gate shader '{}' failed to load; using fallback", name, e);
         }
@@ -45,6 +48,16 @@ public final class ModShaders {
     public static ShaderInstance wormhole() { return orFallback(wormhole); }
 
     public static ShaderInstance rift() { return orFallback(rift); }
+
+    /** Entity-format dissolve program; falls back to the vanilla entity shader (callers check {@link #dissolveReady}). */
+    public static ShaderInstance dissolve() {
+        return dissolve != null ? dissolve : GameRenderer.getRendertypeEntityCutoutNoCullShader();
+    }
+
+    /** The dissolve parameters live in the vertex colour, so only the real program may draw with them. */
+    public static boolean dissolveReady() {
+        return dissolve != null;
+    }
 
     /** True when the real program is available (fallback draws only a tinted quad). */
     public static boolean ready() {

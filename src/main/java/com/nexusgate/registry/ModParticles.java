@@ -20,5 +20,8 @@ public final class ModParticles {
     /** Flat expanding ground ring. */
     public static final DeferredHolder<ParticleType<?>, SimpleParticleType> SHOCK_RING = REGISTER.register("shock_ring", () -> new SimpleParticleType(true));
 
+    /** Quantum fluctuation: a pixel of converted matter riding the relocation beams. */
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> QUANTUM = REGISTER.register("quantum", () -> new SimpleParticleType(true));
+
     private ModParticles() {}
 }
